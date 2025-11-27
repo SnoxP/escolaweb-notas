@@ -10,9 +10,11 @@ import {
   ReferenceLine,
   Cell
 } from 'recharts';
-import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown } from 'lucide-react';
+import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft } from 'lucide-react';
 import InputCard from './components/InputCard';
 import ImportModal from './components/ImportModal';
+import Menu from './components/Menu';
+import LandingPage from './components/LandingPage';
 import { YearScores, BimesterAverages, SemesterAverages, BimesterKey, ScoreKey, AIAnalysisResult, BimesterScores, SubjectMap } from './types';
 import { analyzeGrades } from './services/geminiService';
 
@@ -51,6 +53,8 @@ export default function App() {
     return saved !== null ? saved === 'dark' : true;
   });
 
+  const [showLanding, setShowLanding] = useState(true);
+
   const [subjectName, setSubjectName] = useState(() => {
     return localStorage.getItem('subject_name') || '';
   });
@@ -82,6 +86,7 @@ export default function App() {
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Computed Current Scores based on selected Subject
   const currentScores = useMemo(() => {
@@ -211,6 +216,14 @@ export default function App() {
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
+  // Handlers for Landing Page
+  const handleEnterApp = () => setShowLanding(false);
+  const handleEnterImport = () => {
+    setShowLanding(false);
+    // Use a timeout to allow the transition to happen and component to mount properly before opening modal
+    setTimeout(() => setIsImportModalOpen(true), 100);
+  };
+
   // Chart Data
   const chartData = [
     { name: '1º Bi', grade: bimesterAverages.b1 ? parseFloat(bimesterAverages.b1.toFixed(1)) : 0 },
@@ -246,6 +259,17 @@ export default function App() {
 
   const status = getSystemStatus();
 
+  // RENDER LANDING PAGE IF NEEDED
+  if (showLanding) {
+    return (
+      <LandingPage 
+        onEnterApp={handleEnterApp} 
+        onImportClick={handleEnterImport} 
+      />
+    );
+  }
+
+  // RENDER MAIN APP
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       <div className="flex flex-col items-center py-8 px-4 sm:px-6">
@@ -256,67 +280,97 @@ export default function App() {
           onImport={handleImportData} 
         />
 
+        <Menu 
+          isOpen={isMenuOpen}
+          onClose={() => setIsMenuOpen(false)}
+          onImport={() => setIsImportModalOpen(true)}
+          onClear={clearData}
+          onAiAnalysis={handleAiAnalysis}
+          toggleTheme={toggleTheme}
+          isDarkMode={isDarkMode}
+        />
+
         {/* Header */}
-        <header className="w-full max-w-5xl mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className={`text-3xl font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-              <span className="bg-blue-600 text-white p-2 rounded-xl">
-                <TrendingUp size={24} />
-              </span>
-              Notas da Escolaweb
-            </h1>
-            <p className={`mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Calcule suas médias bimestrais e anuais (TM, TB e TD)
-            </p>
+        <header className="w-full max-w-5xl mb-8 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowLanding(true)}
+              className={`p-2 rounded-xl transition-colors ${
+                isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-white text-slate-500 hover:text-slate-900 shadow-sm'
+              }`}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className={`text-2xl sm:text-3xl font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                <span className="bg-blue-600 text-white p-2 rounded-xl hidden sm:block">
+                  <TrendingUp size={24} />
+                </span>
+                Notas da Escolaweb
+              </h1>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 items-center">
-             <button
-               onClick={toggleTheme}
-               className={`p-2 rounded-lg border transition-colors ${
-                 isDarkMode 
-                   ? 'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700' 
-                   : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-               }`}
-               aria-label="Alternar tema"
-             >
-               {isDarkMode ? <MoonStar size={20} /> : <SunMedium size={20} />}
-             </button>
 
-             <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1 hidden sm:block"></div>
+          <div className="flex items-center gap-2">
+            
+            {/* Desktop Actions (Hidden on Mobile) */}
+            <div className="hidden md:flex items-center gap-2">
+               <button 
+                onClick={toggleTheme}
+                className={`p-2 rounded-lg border transition-colors ${
+                  isDarkMode 
+                    ? 'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Alternar Tema"
+               >
+                 {isDarkMode ? <MoonStar size={20} /> : <SunMedium size={20} />}
+               </button>
 
-             <button 
-              onClick={clearData}
-              className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
-                isDarkMode 
-                  ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
-                  : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
-              }`}
-             >
-               Limpar Tudo
-             </button>
-             <button 
-              onClick={() => setIsImportModalOpen(true)}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
-                isDarkMode
-                  ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-blue-400'
-                  : 'text-slate-700 bg-white border-slate-200 hover:bg-slate-50 hover:text-blue-600'
-              }`}
-             >
-               <Download size={16} />
-               Importar
-             </button>
-             <button 
-              onClick={handleAiAnalysis}
-              disabled={isAiLoading}
-              className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-70 disabled:hover:scale-100"
-             >
-               {isAiLoading ? (
-                 <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-               ) : (
-                 <Sparkles size={16} />
-               )}
-               {isAiLoading ? 'Analisando...' : 'Dicas IA'}
-             </button>
+               <button 
+                onClick={clearData}
+                className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
+                  isDarkMode 
+                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
+                    : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
+                }`}
+               >
+                 Limpar
+               </button>
+               
+               <button 
+                onClick={() => setIsImportModalOpen(true)}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
+                  isDarkMode
+                    ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-blue-400'
+                    : 'text-slate-700 bg-white border-slate-200 hover:bg-slate-50 hover:text-blue-600'
+                }`}
+               >
+                 <Download size={16} />
+                 Importar
+               </button>
+
+               <button 
+                onClick={handleAiAnalysis}
+                disabled={isAiLoading}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-70 disabled:hover:scale-100"
+               >
+                 {isAiLoading ? (
+                   <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                 ) : (
+                   <Sparkles size={16} />
+                 )}
+                 Dicas IA
+               </button>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setIsMenuOpen(true)}
+              className="md:hidden p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+            >
+              <MenuIcon size={24} />
+            </button>
           </div>
         </header>
 
@@ -566,7 +620,7 @@ export default function App() {
 
         <footer className="mt-12 text-center text-slate-500 text-sm">
           <p>Calculadora baseada no sistema TM, TB e TD.</p>
-          <p className="mt-1">© 2024</p>
+          <p className="mt-1">© 2025</p>
         </footer>
       </div>
     </div>
