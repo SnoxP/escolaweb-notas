@@ -1,0 +1,5 @@
+{
+  "name": "Notas da Escolaweb",
+  "description": "Uma calculadora de notas escolares completa baseada no sistema TM, TB e TD. Acompanhe seu desempenho por bimestre, semestre e média final, com insights visuais e dicas de estudo via IA.",
+  "requestFramePermissions": []
+}
