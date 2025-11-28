@@ -10,11 +10,12 @@ import {
   ReferenceLine,
   Cell
 } from 'recharts';
-import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft, Eye, List } from 'lucide-react';
+import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft, Eye, List, HelpCircle } from 'lucide-react';
 import InputCard from './components/InputCard';
 import ImportModal from './components/ImportModal';
 import Menu from './components/Menu';
 import LandingPage from './components/LandingPage';
+import TutorialModal from './components/TutorialModal';
 import { YearScores, BimesterAverages, SemesterAverages, BimesterKey, ScoreKey, AIAnalysisResult, BimesterScores, SubjectMap } from './types';
 import { analyzeGrades } from './services/geminiService';
 
@@ -87,6 +88,7 @@ export default function App() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   // Computed Current Scores based on selected Subject
   const currentScores = useMemo(() => {
@@ -300,12 +302,18 @@ export default function App() {
           onImport={handleImportData} 
         />
 
+        <TutorialModal
+          isOpen={isTutorialOpen}
+          onClose={() => setIsTutorialOpen(false)}
+        />
+
         <Menu 
           isOpen={isMenuOpen}
           onClose={() => setIsMenuOpen(false)}
           onImport={() => setIsImportModalOpen(true)}
           onClear={clearData}
           onAiAnalysis={handleAiAnalysis}
+          onOpenTutorial={() => setIsTutorialOpen(true)}
           toggleTheme={toggleTheme}
           isDarkMode={isDarkMode}
         />
@@ -334,6 +342,19 @@ export default function App() {
           <div className="flex items-center gap-2">
             
             <div className="hidden md:flex items-center gap-2">
+               
+               <button 
+                onClick={() => setIsTutorialOpen(true)}
+                className={`p-2 rounded-lg border transition-colors ${
+                  isDarkMode 
+                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
+                    : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
+                }`}
+                title="Ajuda / Tutorial"
+               >
+                 <HelpCircle size={20} />
+               </button>
+
                {/* View Toggle */}
                <button 
                 onClick={toggleViewMode}

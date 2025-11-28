@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Download, Trash2, MoonStar, SunMedium, ExternalLink, Sparkles, GraduationCap } from 'lucide-react';
+import { X, Download, Trash2, MoonStar, SunMedium, ExternalLink, Sparkles, GraduationCap, HelpCircle } from 'lucide-react';
 
 interface MenuProps {
   isOpen: boolean;
@@ -7,6 +7,7 @@ interface MenuProps {
   onImport: () => void;
   onClear: () => void;
   onAiAnalysis: () => void;
+  onOpenTutorial: () => void;
   toggleTheme: () => void;
   isDarkMode: boolean;
 }
@@ -16,7 +17,8 @@ const Menu: React.FC<MenuProps> = ({
   onClose, 
   onImport, 
   onClear, 
-  onAiAnalysis, 
+  onAiAnalysis,
+  onOpenTutorial,
   toggleTheme, 
   isDarkMode 
 }) => {
@@ -103,8 +105,16 @@ const Menu: React.FC<MenuProps> = ({
             <div className="my-4 border-t border-slate-100 dark:border-slate-800"></div>
             
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Links Úteis
+              Ajuda
             </p>
+
+            <button 
+              onClick={() => { onOpenTutorial(); onClose(); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <HelpCircle size={20} className="text-purple-500" />
+              Como usar o site
+            </button>
 
             <a 
               href="https://cmachado.escolaweb.com.br/index.html#!/notasparciais" 
@@ -125,7 +135,7 @@ const Menu: React.FC<MenuProps> = ({
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Notas da Escolaweb</p>
-                  <p className="text-[10px]">Versão 2.0</p>
+                  <p className="text-[10px]">Versão 2.1</p>
                 </div>
              </div>
           </div>
