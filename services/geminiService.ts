@@ -92,72 +92,27 @@ export const analyzeGrades = async (
 /**
  * Parsing local ROBUSTO e SEQUENCIAL.
  */
-const localFastParse = (text: string, subject: string, forceBimester?: BimesterKey | null): YearScores | null => {
-  if (!text || !subject) return null;
+const localFastParse = (fullText: string, subject: string, forceBimester?: BimesterKey | null): YearScores | null => {
+  if (!fullText || !subject) return null;
 
   // 1. Normalização
   const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const cleanText = normalize(text);
+  const cleanText = normalize(fullText);
   const normalizedSubject = normalize(subject);
 
-  // 2. Definir variações do nome da matéria
-  // Ordenar termos por tamanho (decrescente) ajuda a evitar que "Matemática" dê match em "Matemática II" incorretamente
+  // 2. Definir termos de busca para a matéria
   let searchTerms = [];
   
   if (normalizedSubject === 'artes') searchTerms.push('arte');
   else if (normalizedSubject === 'ingles') searchTerms.push('lingua inglesa');
   else if (normalizedSubject === 'espanhol') searchTerms.push('lingua espanhola');
-  else if (normalizedSubject === 'gramatica') searchTerms.push('lingua portuguesa'); // Fallback se não achar gramática específico
+  else if (normalizedSubject === 'gramatica') searchTerms.push('lingua portuguesa'); 
   else if (normalizedSubject === 'interpretacao de texto') searchTerms.push('lingua portuguesa');
   else if (normalizedSubject.includes('portugues')) searchTerms.push('lingua portuguesa');
   
-  // Adiciona o termo normalizado como prioritário
   searchTerms.unshift(normalizedSubject);
   
-  // 3. Encontrar start index
-  let startIndex = -1;
-  let foundTerm = '';
-
-  for (const term of searchTerms) {
-    let pos = cleanText.indexOf(term);
-    
-    // Tratamento de colisão
-    while (pos !== -1) {
-      // 1. "Física" dentro de "Educação Física"
-      const isPartOfEducation = term === 'fisica' && 
-        cleanText.substring(Math.max(0, pos - 15), pos).includes('educacao');
-      
-      // 2. "Matemática" dentro de "Matemática II" ou "Matemática I"
-      // Se estamos procurando "matematica" (genérico), mas o texto tem "matematica i" ou "matematica ii", devemos pular
-      // para não atribuir notas de Mat II para Mat I.
-      let isPartofRoman = false;
-      if (term === 'matematica' || term === 'biologia') {
-         // Verifica o que vem depois
-         const nextChars = cleanText.substring(pos + term.length, pos + term.length + 5).trim();
-         // Se começar com i ou ii ou fundamental, e não for o que estamos procurando exato
-         if (nextChars.startsWith('i') || nextChars.startsWith('v') || nextChars.includes('fundamental')) {
-             // Se o termo buscado não inclui esse sufixo, então é uma colisão
-             if (!term.includes('i') && !term.includes('fundamental')) {
-                 isPartofRoman = true;
-             }
-         }
-      }
-
-      if (!isPartOfEducation && !isPartofRoman) {
-        startIndex = pos;
-        foundTerm = term;
-        break; 
-      }
-      pos = cleanText.indexOf(term, pos + 1);
-    }
-    
-    if (startIndex !== -1) break;
-  }
-
-  if (startIndex === -1) return null;
-
-  // 4. Encontrar end index (próxima matéria)
-  // Adicionamos as matérias romanas aqui para servirem de "stop words" umas para as outras
+  // Lista de todas as matérias para servir de "Stop Words"
   const allSubjects = [
     "arte", "biologia", "biologia i", "biologia ii", 
     "educacao fisica", "filosofia", "fisica", 
@@ -167,140 +122,214 @@ const localFastParse = (text: string, subject: string, forceBimester?: BimesterK
     "projeto de vida", "quimica", "redacao", "sociologia"
   ];
 
-  let endIndex = cleanText.length;
-  const searchStartPos = startIndex + foundTerm.length;
-
-  for (const sub of allSubjects) {
-    if (foundTerm.includes(sub) || sub.includes(foundTerm)) continue;
-    
-    // Procura a próxima matéria APÓS o início da matéria atual
-    const idx = cleanText.indexOf(sub, searchStartPos);
-    
-    if (sub === 'fisica') {
-       const isFakePhysics = cleanText.substring(Math.max(0, idx - 15), idx).includes('educacao');
-       if (isFakePhysics) continue;
-    }
-
-    if (idx !== -1 && idx < endIndex) {
-      endIndex = idx;
-    }
-  }
-
-  let sectionText = cleanText.slice(startIndex, endIndex);
-
-  // 4.5 REMOVER "Total X Semestre" para ignorar
-  sectionText = sectionText.replace(/total\s*.*semestre.*(\n|$)/g, " ");
-
-  // 5. HELPER: Extrair valor
-  const findValue = (labelRegex: RegExp): number | null => {
-    const matchLabel = labelRegex.exec(sectionText);
-    if (!matchLabel) return null;
-    const textAfterLabel = sectionText.slice(matchLabel.index + matchLabel[0].length);
-
-    // CORREÇÃO CRÍTICA:
-    // Verifica se a nota é vazia (representada por "-" ou "- /")
-    const emptyMatch = textAfterLabel.match(/^\s*-\s*\//) || textAfterLabel.match(/^\s*-\s*(\n|$)/);
-    if (emptyMatch) {
-        return null; 
-    }
-
-    // Procura o PRIMEIRO número (inteiro ou decimal com , ou .)
-    const matchNumber = textAfterLabel.match(/(\d+([.,]\d+)?)/);
-    if (matchNumber) {
-      return parseFloat(matchNumber[0].replace(',', '.'));
-    }
-    return null;
+  // Estrutura de resultado acumulativo
+  const result: YearScores = {
+    b1: { tm: '', tb: '', td: '' },
+    b2: { tm: '', tb: '', td: '' },
+    b3: { tm: '', tb: '', td: '' },
+    b4: { tm: '', tb: '', td: '' }
   };
-
-  const fmt = (val: number | null) => val !== null ? val.toFixed(2) : '';
-
-  // --- MODO DETALHADO (FORÇADO PELO USUÁRIO OU DETECÇÃO) ---
   
-  if (forceBimester) {
-    const tmVal = findValue(/teste\s*mensal/);
-    const tbVal = findValue(/teste\s*bimestral/);
-    const tdVal = findValue(/teste\s*dirigido|trabalhos/);
+  // Array para armazenar todas as ocorrências encontradas
+  interface Match {
+    sectionText: string;
+    startIndex: number;
+  }
+  const matches: Match[] = [];
 
-    const result: YearScores = {
-      b1: { tm: '', tb: '', td: '' },
-      b2: { tm: '', tb: '', td: '' },
-      b3: { tm: '', tb: '', td: '' },
-      b4: { tm: '', tb: '', td: '' }
-    };
-    
-    // Se encontrou algo, preenche. Se não, deixa vazio.
-    // Importante: Notas "0.0" devem ser importadas. Notas null/vazias não.
-    if (tmVal !== null || tbVal !== null || tdVal !== null) {
-        result[forceBimester] = {
-            tm: fmt(tmVal),
-            tb: fmt(tbVal),
-            td: fmt(tdVal)
-        };
-        return result;
+  // 3. Encontrar TODAS as ocorrências da matéria no texto
+  let currentPos = 0;
+  
+  while (currentPos < cleanText.length) {
+    let bestStartIndex = -1;
+    let foundTermLength = 0;
+
+    // Procura o próximo termo válido
+    for (const term of searchTerms) {
+      let pos = cleanText.indexOf(term, currentPos);
+      
+      // Tratamento de colisão (ex: "Física" em "Educação Física")
+      while (pos !== -1) {
+        const isPartOfEducation = term === 'fisica' && 
+          cleanText.substring(Math.max(0, pos - 15), pos).includes('educacao');
+        
+        let isPartofRoman = false;
+        if (term === 'matematica' || term === 'biologia') {
+           const nextChars = cleanText.substring(pos + term.length, pos + term.length + 5).trim();
+           if (nextChars.startsWith('i') || nextChars.startsWith('v') || nextChars.includes('fundamental')) {
+               if (!term.includes('i') && !term.includes('fundamental')) {
+                   isPartofRoman = true;
+               }
+           }
+        }
+
+        if (!isPartOfEducation && !isPartofRoman) {
+          if (bestStartIndex === -1 || pos < bestStartIndex) {
+            bestStartIndex = pos;
+            foundTermLength = term.length;
+          }
+          break; 
+        }
+        pos = cleanText.indexOf(term, pos + 1);
+      }
     }
-    // Se não encontrou NADA dessa matéria nesse bloco, retorna null para não sobrescrever com vazios
-    return null;
+
+    if (bestStartIndex === -1) break;
+
+    const sectionStart = bestStartIndex;
+    currentPos = bestStartIndex + foundTermLength; 
+
+    // Determinar FIM da seção
+    let sectionEnd = cleanText.length;
+    for (const sub of allSubjects) {
+      if (cleanText.substring(sectionStart, sectionStart + foundTermLength).includes(sub)) continue; 
+      
+      const idx = cleanText.indexOf(sub, sectionStart + foundTermLength);
+      
+      if (sub === 'fisica') {
+         const isFakePhysics = cleanText.substring(Math.max(0, idx - 15), idx).includes('educacao');
+         if (isFakePhysics) continue;
+      }
+
+      if (idx !== -1 && idx < sectionEnd) {
+        sectionEnd = idx;
+      }
+    }
+
+    let sectionText = cleanText.slice(sectionStart, sectionEnd);
+    sectionText = sectionText.replace(/total\s*.*semestre.*(\n|$)/g, " ");
+    
+    matches.push({
+      sectionText,
+      startIndex: sectionStart
+    });
+    
+    // Atualiza ponteiro para buscar próxima ocorrência
+    currentPos = sectionEnd; 
   }
 
-  // --- DETECÇÃO DE MODO: DETALHADO (NOTAS PARCIAIS) VS GERAL ---
-  const hasDetailedInfo = /teste\s*mensal|teste\s*dirigido|teste\s*bimestral/i.test(sectionText);
+  if (matches.length === 0) return null;
 
-  if (hasDetailedInfo) {
-    let activeBimester = 1; 
-    if (cleanText.includes('4º bimestre') || cleanText.includes('4o bimestre')) activeBimester = 4;
-    else if (cleanText.includes('3º bimestre') || cleanText.includes('3o bimestre')) activeBimester = 3;
-    else if (cleanText.includes('2º bimestre') || cleanText.includes('2o bimestre')) activeBimester = 2;
-    else if (cleanText.includes('1º bimestre') || cleanText.includes('1o bimestre')) activeBimester = 1;
+  let hasAnyData = false;
 
-    const tmVal = findValue(/teste\s*mensal/);
-    const tbVal = findValue(/teste\s*bimestral/);
-    const tdVal = findValue(/teste\s*dirigido|trabalhos/);
+  // 4. Processar Matches com Lógica de Sequência ou Header
+  matches.forEach((match, index) => {
+    let detectedBimester: BimesterKey | null = null;
 
-    const result: YearScores = {
-      b1: { tm: '', tb: '', td: '' },
-      b2: { tm: '', tb: '', td: '' },
-      b3: { tm: '', tb: '', td: '' },
-      b4: { tm: '', tb: '', td: '' }
+    if (forceBimester) {
+      detectedBimester = forceBimester;
+    } else {
+      // --- Lógica de Detecção Inteligente ---
+      
+      // A) Se tivermos múltiplas ocorrências, assumimos SEQUÊNCIA (B1 -> B2 -> B3 -> B4)
+      // Isso resolve o problema de colar "Notas Parciais" completas com todos os bimestres.
+      if (matches.length > 1) {
+        if (index === 0) detectedBimester = 'b1';
+        else if (index === 1) detectedBimester = 'b2';
+        else if (index === 2) detectedBimester = 'b3';
+        else if (index === 3) detectedBimester = 'b4';
+      } 
+      // B) Se for ocorrência única, tentamos detectar pelo cabeçalho (Lookbehind)
+      else {
+        // Tenta achar "Xº Bimestre" DENTRO da seção (prioridade máxima)
+        if (/1[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b1';
+        else if (/2[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b2';
+        else if (/3[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b3';
+        else if (/4[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b4';
+        
+        // Se não achou dentro, olha para TRÁS no texto geral
+        if (!detectedBimester) {
+            const textBefore = cleanText.slice(0, match.startIndex);
+            const lastB1 = textBefore.lastIndexOf('1º bimestre');
+            const lastB2 = textBefore.lastIndexOf('2º bimestre');
+            const lastB3 = textBefore.lastIndexOf('3º bimestre');
+            const lastB4 = textBefore.lastIndexOf('4º bimestre');
+
+            const headers = [
+                { id: 'b1', idx: lastB1 }, 
+                { id: 'b2', idx: lastB2 }, 
+                { id: 'b3', idx: lastB3 }, 
+                { id: 'b4', idx: lastB4 }
+            ].sort((a, b) => b.idx - a.idx);
+
+            if (headers[0].idx !== -1) {
+                // VERIFICAÇÃO DE MENU:
+                // Se os cabeçalhos estão "amontoados" (ex: menu do topo da página), ignorar e assumir B1.
+                // Isso previne que o último item do menu (4º Bimestre) seja falsamente detectado como o cabeçalho ativo.
+                const minIdx = Math.min(...headers.filter(h => h.idx !== -1).map(h => h.idx));
+                const maxIdx = headers[0].idx;
+                
+                // Se a distância entre o primeiro e o último cabeçalho encontrado for pequena (ex: < 150 chars), é um menu.
+                if (maxIdx - minIdx < 150 && headers.filter(h => h.idx !== -1).length > 1) {
+                    // Menu detectado. Assumir B1 como padrão seguro para Notas Parciais se o usuário colou apenas o conteúdo ativo.
+                    detectedBimester = 'b1'; 
+                } else {
+                    detectedBimester = headers[0].id as BimesterKey;
+                }
+            } else {
+                // Sem cabeçalhos? Padrão B1.
+                detectedBimester = 'b1';
+            }
+        }
+      }
+    }
+
+    if (!detectedBimester) return;
+
+    // 5. Extrair Valores da Seção
+    const hasDetailedKeywords = /teste\s*mensal|teste\s*bimestral|teste\s*dirigido|avaliação|pontuação/i.test(match.sectionText);
+
+    const findValue = (labelRegex: RegExp): string | null => {
+      const matchLabel = labelRegex.exec(match.sectionText);
+      if (!matchLabel) return null; 
+      
+      const textAfterLabel = match.sectionText.slice(matchLabel.index + matchLabel[0].length);
+
+      // Regex atualizado para lidar com "- / 10.00" ou apenas "-"
+      const emptyMatch = textAfterLabel.match(/^\s*-\s*\//) || textAfterLabel.match(/^\s*-\s*(\n|$)/);
+      if (emptyMatch) {
+          return ''; 
+      }
+
+      const matchNumber = textAfterLabel.match(/(\d+([.,]\d+)?)/);
+      if (matchNumber) {
+        return parseFloat(matchNumber[0].replace(',', '.')).toFixed(2);
+      }
+      return ''; 
     };
 
-    const targetKey = `b${activeBimester}` as keyof YearScores;
-    result[targetKey] = {
-      tm: fmt(tmVal),
-      tb: fmt(tbVal),
-      td: fmt(tdVal)
-    };
-    return result;
-  }
+    // MODO DETALHADO (TM/TB/TD)
+    if (hasDetailedKeywords || forceBimester || matches.length > 1) {
+        const tmVal = findValue(/teste\s*mensal/);
+        const tbVal = findValue(/teste\s*bimestral/);
+        const tdVal = findValue(/teste\s*dirigido|trabalhos/);
+        
+        // Se achou qualquer valor OU se é um campo vazio explícito (tmVal === ''), salvamos.
+        // Verificamos != null pois findValue retorna null se não achar a Label.
+        if (tmVal !== null || tbVal !== null || tdVal !== null) {
+            result[detectedBimester] = {
+                tm: tmVal || result[detectedBimester].tm,
+                tb: tbVal || result[detectedBimester].tb,
+                td: tdVal || result[detectedBimester].td
+            };
+            hasAnyData = true;
+        }
+    } 
+    // MODO GERAL (Médias Finais apenas) - fallback
+    else {
+        const b1Avg = findValue(/1[ºo°]?\s*bimestre/);
+        const b2Avg = findValue(/2[ºo°]?\s*bimestre/);
+        const b3Avg = findValue(/3[ºo°]?\s*bimestre/);
+        const b4Avg = findValue(/4[ºo°]?\s*bimestre/);
 
-  // --- MODO GERAL (Resultados Gerais - Apenas Médias) ---
+        if (b1Avg !== null) { result.b1.tb = b1Avg; hasAnyData = true; }
+        if (b2Avg !== null) { result.b2.tb = b2Avg; hasAnyData = true; }
+        if (b3Avg !== null) { result.b3.tb = b3Avg; hasAnyData = true; }
+        if (b4Avg !== null) { result.b4.tb = b4Avg; hasAnyData = true; }
+    }
+  });
 
-  let v1 = findValue(/1[ºo°]?\s*bimestre/);
-  let v2 = findValue(/2[ºo°]?\s*bimestre/);
-  let v3 = findValue(/3[ºo°]?\s*bimestre/);
-  let v4 = findValue(/4[ºo°]?\s*bimestre/);
-
-  // Extrair notas de RECUPERAÇÃO (Rec)
-  const rec1 = findValue(/rec(uperacao)?\s*1[ºo°]?\s*semestre/);
-  const rec2 = findValue(/rec(uperacao)?\s*2[ºo°]?\s*semestre/);
-
-  // Lógica de recuperação
-  if (rec1 !== null) {
-    const bonus = rec1 / 4;
-    v2 = (v2 || 0) + bonus;
-  }
-  if (rec2 !== null) {
-    const bonus = rec2 / 4;
-    v4 = (v4 || 0) + bonus;
-  }
-
-  if (v1 === null && v2 === null && v3 === null && v4 === null) return null;
-
-  return {
-    b1: { tm: '', tb: fmt(v1), td: '' },
-    b2: { tm: '', tb: fmt(v2), td: '' },
-    b3: { tm: '', tb: fmt(v3), td: '' },
-    b4: { tm: '', tb: fmt(v4), td: '' }
-  };
+  return hasAnyData ? result : null;
 };
 
 /**
