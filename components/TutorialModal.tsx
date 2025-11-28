@@ -20,7 +20,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose }) => {
     },
     {
       title: "Importação Automática",
-      description: "Não perca tempo digitando! Vá ao site do EscolaWeb (Notas Parciais ou Resultados), selecione todo o conteúdo (Ctrl+A), copie (Ctrl+C) e use o botão 'Importar' aqui.",
+      description: "Acesse o EscolaWeb pelo navegador (o App não permite copiar). Vá em Notas Parciais, selecione tudo (Ctrl+A), copie e cole no botão 'Importar'.",
       icon: <Copy size={64} className="text-emerald-500" />,
       color: "bg-emerald-50 dark:bg-emerald-900/20"
     },
