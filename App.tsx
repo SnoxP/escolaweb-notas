@@ -247,6 +247,7 @@ export default function App() {
   const handleEnterApp = () => {
     setViewMode('simple'); // Default to simple view for General Results
     setShowLanding(false);
+    setTimeout(() => setIsImportModalOpen(true), 100);
   }
   
   const handleEnterPartialImport = () => {
@@ -363,7 +364,7 @@ export default function App() {
                     ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
                     : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
                 }`}
-                title={viewMode === 'simple' ? "Mudar para Detalhado (TM/TB/TD)" : "Mudar para Resumo"}
+                title={viewMode === 'simple' ? "Mudar para Detalhado (Notas Parciais)" : "Mudar para Resultados Gerais"}
                >
                  {viewMode === 'simple' ? <List size={18} /> : <Eye size={18} />}
                  <span className="hidden lg:inline">{viewMode === 'simple' ? 'Detalhes' : 'Resumo'}</span>

@@ -58,7 +58,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
               </div>
               <div>
                 <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Resultados Gerais</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Visualizar médias dos bimestres</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Importar ou visualizar médias</p>
               </div>
             </div>
             <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-blue-500 transition-colors" />
