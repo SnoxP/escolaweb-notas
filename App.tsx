@@ -26,6 +26,7 @@ const INITIAL_SCORES: YearScores = {
   b4: { tm: '', tb: '', td: '' },
 };
 
+// Lista unificada de matérias
 const SUBJECTS = [
   "Filosofia", 
   "Geografia", 
@@ -33,15 +34,11 @@ const SUBJECTS = [
   "Química", 
   "Inglês", 
   "Física", 
-  "Matemática I", 
-  "Matemática II",
-  "Matemática Fundamental",
-  "Biologia I",
-  "Biologia II",
+  "Matemática", // Unificado (I, II, Fundamental)
+  "Biologia",   // Unificado (I, II)
   "História", 
   "Literatura", 
-  "Gramática", 
-  "Interpretação de Texto",
+  "Língua Portuguesa", // Unificado (Gramática, Interpretação)
   "Educação Física",
   "Redação",
   "Sociologia",

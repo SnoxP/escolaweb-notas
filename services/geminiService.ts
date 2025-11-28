@@ -8,13 +8,14 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // List of subjects to scan for during bulk import
 // ATENÇÃO: Esta lista deve estar sincronizada com a do App.tsx
-// Removidas matérias genéricas (Matemática, Biologia) que possuem versões numeradas
+// Nomes Unificados
 const KNOWN_SUBJECTS = [
   "Filosofia", "Geografia", "Artes", "Química", "Inglês", "Física",
-  "Matemática I", "Matemática II", "Matemática Fundamental",
-  "Biologia I", "Biologia II",
-  "História", "Literatura", "Gramática",
-  "Interpretação de Texto", "Educação Física", "Redação", "Sociologia",
+  "Matemática", // Unificado
+  "Biologia",   // Unificado
+  "História", "Literatura", 
+  "Língua Portuguesa", // Unificado
+  "Educação Física", "Redação", "Sociologia",
   "Espanhol", "Projeto de Vida"
 ];
 
@@ -100,19 +101,32 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
   const cleanText = normalize(fullText);
   const normalizedSubject = normalize(subject);
 
-  // 2. Definir termos de busca para a matéria
-  let searchTerms = [];
+  // 2. Definir termos de busca para a matéria (Aliases)
+  let searchTerms: string[] = [];
   
   if (normalizedSubject === 'artes') searchTerms.push('arte');
   else if (normalizedSubject === 'ingles') searchTerms.push('lingua inglesa');
   else if (normalizedSubject === 'espanhol') searchTerms.push('lingua espanhola');
-  else if (normalizedSubject === 'gramatica') searchTerms.push('lingua portuguesa'); 
-  else if (normalizedSubject === 'interpretacao de texto') searchTerms.push('interpretacao de textos', 'lingua portuguesa');
-  else if (normalizedSubject.includes('portugues')) searchTerms.push('lingua portuguesa');
+  else if (normalizedSubject === 'lingua portuguesa') {
+      // Mapeia todas as variantes de Português para uma única matéria
+      searchTerms.push('gramatica', 'interpretacao de texto', 'interpretacao de textos', 'lingua portuguesa', 'portugues');
+  }
+  else if (normalizedSubject === 'matematica') {
+      // Mapeia todas as Matemáticas para uma única matéria
+      searchTerms.push('matematica i', 'matematica ii', 'matematica fundamental', 'matematica');
+  }
+  else if (normalizedSubject === 'biologia') {
+      // Mapeia todas as Biologias para uma única matéria
+      searchTerms.push('biologia i', 'biologia ii', 'biologia');
+  }
   
-  searchTerms.unshift(normalizedSubject);
+  // Se não for um caso especial, usa o próprio nome
+  if (searchTerms.length === 0) {
+      searchTerms.push(normalizedSubject);
+  }
   
-  // Lista de todas as matérias para servir de "Stop Words"
+  // Lista de todas as matérias (incluindo as antigas) para servir de "Stop Words"
+  // Isso garante que o parser saiba onde parar mesmo se encontrar um nome antigo
   const allSubjects = [
     "arte", "biologia", "biologia i", "biologia ii", 
     "educacao fisica", "filosofia", "fisica", 
@@ -120,7 +134,7 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
     "lingua espanhola", "lingua inglesa", "lingua portuguesa", 
     "matematica", "matematica i", "matematica ii", "matematica fundamental",
     "projeto de vida", "quimica", "redacao", "sociologia",
-    "interpretacao de textos"
+    "interpretacao de textos", "gramatica"
   ];
 
   // Estrutura de resultado acumulativo
@@ -158,6 +172,9 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
         
         // Check 2: Word Boundary (Crucial para "Matemática I" vs "Matemática II")
         // Verifica se o caractere APÓS o termo é uma letra ou número, o que indicaria que o termo continua
+        // Mas se estivermos procurando por "Matematica" (genérico) e acharmos "Matematica I", devemos aceitar?
+        // A lógica de searchTerms coloca os mais específicos (I, II) também na lista se necessário.
+        // Se a busca for "Matematica" e acharmos "Matematica", ok.
         const charAfter = cleanText[pos + term.length];
         const isSubstring = charAfter && /[a-z0-9]/i.test(charAfter);
 
@@ -177,12 +194,11 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
     if (bestStartIndex === -1) break;
 
     const sectionStart = bestStartIndex;
-    currentPos = bestStartIndex + foundTermLength; 
-
+    
     // Determinar FIM da seção (início da próxima matéria)
     let sectionEnd = cleanText.length;
     for (const sub of allSubjects) {
-      // Ignora a própria matéria se encontrada logo no início
+      // Ignora a própria matéria se encontrada logo no início (ex: título repetido)
       if (cleanText.substring(sectionStart, sectionStart + foundTermLength + 5).includes(sub)) continue; 
       
       let idx = cleanText.indexOf(sub, sectionStart + foundTermLength);
@@ -216,7 +232,8 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
       startIndex: sectionStart
     });
     
-    // Atualiza ponteiro para buscar próxima ocorrência da MESMA matéria (ex: próximo bimestre na lista)
+    // Atualiza ponteiro para buscar próxima ocorrência
+    // Se achamos "Matemática I", avançamos. A próxima pode ser "Matemática II" (se estivermos unificando).
     currentPos = sectionEnd; 
   }
 
@@ -234,11 +251,17 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
       // --- Lógica de Detecção Inteligente ---
       
       // A) Se tivermos múltiplas ocorrências VÁLIDAS, assumimos SEQUÊNCIA
+      // OBS: Se unificamos "Mat I" e "Mat II", podemos ter 8 ocorrências se o cara colou tudo.
+      // Nesse caso, o código vai tentar preencher B1..B4 repetidamente.
+      // Como o objeto `result` é acumulativo, a segunda ocorrência de B1 vai sobrescrever a primeira.
+      // Isso é o comportamento desejado se quisermos apenas "uma" nota (a última válida encontrada).
       if (matches.length > 1) {
-        if (index === 0) detectedBimester = 'b1';
-        else if (index === 1) detectedBimester = 'b2';
-        else if (index === 2) detectedBimester = 'b3';
-        else if (index === 3) detectedBimester = 'b4';
+        // Usa módulo para lidar com múltiplas matérias unificadas (ex: Mat I 4 bims + Mat II 4 bims = 8 itens)
+        const seqIndex = index % 4; 
+        if (seqIndex === 0) detectedBimester = 'b1';
+        else if (seqIndex === 1) detectedBimester = 'b2';
+        else if (seqIndex === 2) detectedBimester = 'b3';
+        else if (seqIndex === 3) detectedBimester = 'b4';
       } 
       // B) Ocorrência única: Tenta detectar pelo cabeçalho
       else {
@@ -323,7 +346,7 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
         const tdVal = findValue(/teste\s*dirigido|trabalhos/);
         
         // Se achou qualquer valor OU se identificou campo vazio (''), salvamos.
-        // Se forçado, escrevemos mesmo que tudo seja nulo/vazio para limpar se necessário (depende da estratégia de merge do app, mas aqui retornamos o que achamos)
+        // Se já existe valor (de uma Matéria anterior unificada ex: Mat I), só sobrescreve se o novo for válido (não nulo)
         if (tmVal !== null || tbVal !== null || tdVal !== null) {
             result[detectedBimester] = {
                 tm: tmVal !== null ? tmVal : result[detectedBimester].tm,
