@@ -10,7 +10,7 @@ import {
   ReferenceLine,
   Cell
 } from 'recharts';
-import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft } from 'lucide-react';
+import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft, Eye, List } from 'lucide-react';
 import InputCard from './components/InputCard';
 import ImportModal from './components/ImportModal';
 import Menu from './components/Menu';
@@ -32,8 +32,11 @@ const SUBJECTS = [
   "Química", 
   "Inglês", 
   "Física", 
-  "Matemática", 
-  "Biologia", 
+  "Matemática I", 
+  "Matemática II",
+  "Matemática Fundamental",
+  "Biologia I",
+  "Biologia II",
   "História", 
   "Literatura", 
   "Gramática", 
@@ -54,6 +57,7 @@ export default function App() {
   });
 
   const [showLanding, setShowLanding] = useState(true);
+  const [viewMode, setViewMode] = useState<'simple' | 'detailed'>('simple');
 
   const [subjectName, setSubjectName] = useState(() => {
     return localStorage.getItem('subject_name') || '';
@@ -64,13 +68,9 @@ export default function App() {
     const saved = localStorage.getItem('school_grades_db');
     if (saved) return JSON.parse(saved);
     
-    // Migration/Legacy fallback: check if old single-subject data exists
+    // Migration/Legacy fallback
     const legacy = localStorage.getItem('school_grades');
-    if (legacy) {
-      // If we have legacy data, we don't know which subject it belongs to.
-      // We can start clean or assign to 'Unknown'. Starting clean is safer for the new structure.
-      return {}; 
-    }
+    if (legacy) return {}; 
     return {};
   });
 
@@ -136,7 +136,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Recalculate whenever currentScores changes (either by editing or switching subject)
     const b1 = calculateAvg(currentScores.b1);
     const b2 = calculateAvg(currentScores.b2);
     const b3 = calculateAvg(currentScores.b3);
@@ -156,7 +155,6 @@ export default function App() {
       setFinalAverage(null);
     }
     
-    // Clear AI result when switching subjects or editing
     setAiResult(null);
 
   }, [currentScores]);
@@ -191,16 +189,41 @@ export default function App() {
   };
 
   const handleImportData = (importedMap: SubjectMap) => {
-    // Merge imported grades with existing ones
-    setAllGrades(prev => ({
-      ...prev,
-      ...importedMap
-    }));
+    setAllGrades(prev => {
+      const nextState = { ...prev };
+      Object.keys(importedMap).forEach(subject => {
+        const newScores = importedMap[subject];
+        const oldScores = prev[subject] || INITIAL_SCORES;
+
+        nextState[subject] = {
+          b1: {
+            tm: newScores.b1.tm || oldScores.b1.tm,
+            tb: newScores.b1.tb || oldScores.b1.tb,
+            td: newScores.b1.td || oldScores.b1.td,
+          },
+          b2: {
+            tm: newScores.b2.tm || oldScores.b2.tm,
+            tb: newScores.b2.tb || oldScores.b2.tb,
+            td: newScores.b2.td || oldScores.b2.td,
+          },
+          b3: {
+            tm: newScores.b3.tm || oldScores.b3.tm,
+            tb: newScores.b3.tb || oldScores.b3.tb,
+            td: newScores.b3.td || oldScores.b3.td,
+          },
+          b4: {
+            tm: newScores.b4.tm || oldScores.b4.tm,
+            tb: newScores.b4.tb || oldScores.b4.tb,
+            td: newScores.b4.td || oldScores.b4.td,
+          },
+        };
+      });
+      return nextState;
+    });
     
     const count = Object.keys(importedMap).length;
-    alert(`${count} matérias foram atualizadas com sucesso!`);
+    alert(`${count} matérias foram atualizadas/mescladas com sucesso!`);
     
-    // If user hasn't selected a subject yet, auto-select the first imported one
     if (!subjectName && count > 0) {
       setSubjectName(Object.keys(importedMap)[0]);
     }
@@ -215,14 +238,20 @@ export default function App() {
   };
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
+  
+  const toggleViewMode = () => setViewMode(prev => prev === 'simple' ? 'detailed' : 'simple');
 
   // Handlers for Landing Page
-  const handleEnterApp = () => setShowLanding(false);
-  const handleEnterImport = () => {
+  const handleEnterApp = () => {
+    setViewMode('simple'); // Default to simple view for General Results
     setShowLanding(false);
-    // Use a timeout to allow the transition to happen and component to mount properly before opening modal
-    setTimeout(() => setIsImportModalOpen(true), 100);
-  };
+  }
+  
+  const handleEnterPartialImport = () => {
+      setViewMode('detailed'); // Switch to detailed view for Partial Import
+      setShowLanding(false);
+      setTimeout(() => setIsImportModalOpen(true), 100);
+  }
 
   // Chart Data
   const chartData = [
@@ -239,37 +268,28 @@ export default function App() {
     const hasAnyInput = (Object.values(currentScores) as BimesterScores[]).some(b => 
       b.tm.trim() !== '' || b.tb.trim() !== '' || b.td.trim() !== ''
     );
-
     const hasAnyValidAverage = 
       bimesterAverages.b1 !== null || 
       bimesterAverages.b2 !== null || 
       bimesterAverages.b3 !== null || 
       bimesterAverages.b4 !== null;
 
-    if (!hasAnyInput) {
-      return { color: 'bg-red-500 shadow-red-500/50', text: 'Não aplicado notas' };
-    }
-
-    if (hasAnyInput && !hasAnyValidAverage) {
-      return { color: 'bg-yellow-500 shadow-yellow-500/50', text: 'Erro' };
-    }
-
+    if (!hasAnyInput) return { color: 'bg-red-500 shadow-red-500/50', text: 'Não aplicado notas' };
+    if (hasAnyInput && !hasAnyValidAverage) return { color: 'bg-yellow-500 shadow-yellow-500/50', text: 'Erro' };
     return { color: 'bg-green-500 shadow-green-500/50', text: 'Aplicado nota' };
   };
 
   const status = getSystemStatus();
 
-  // RENDER LANDING PAGE IF NEEDED
   if (showLanding) {
     return (
       <LandingPage 
         onEnterApp={handleEnterApp} 
-        onImportClick={handleEnterImport} 
+        onPartialImportClick={handleEnterPartialImport}
       />
     );
   }
 
-  // RENDER MAIN APP
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       <div className="flex flex-col items-center py-8 px-4 sm:px-6">
@@ -313,8 +333,21 @@ export default function App() {
 
           <div className="flex items-center gap-2">
             
-            {/* Desktop Actions (Hidden on Mobile) */}
             <div className="hidden md:flex items-center gap-2">
+               {/* View Toggle */}
+               <button 
+                onClick={toggleViewMode}
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
+                  isDarkMode 
+                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
+                    : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
+                }`}
+                title={viewMode === 'simple' ? "Mudar para Detalhado (TM/TB/TD)" : "Mudar para Resumo"}
+               >
+                 {viewMode === 'simple' ? <List size={18} /> : <Eye size={18} />}
+                 <span className="hidden lg:inline">{viewMode === 'simple' ? 'Detalhes' : 'Resumo'}</span>
+               </button>
+
                <button 
                 onClick={toggleTheme}
                 className={`p-2 rounded-lg border transition-colors ${
@@ -322,7 +355,6 @@ export default function App() {
                     ? 'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700' 
                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
-                title="Alternar Tema"
                >
                  {isDarkMode ? <MoonStar size={20} /> : <SunMedium size={20} />}
                </button>
@@ -422,6 +454,7 @@ export default function App() {
                 data={currentScores.b1} 
                 average={bimesterAverages.b1} 
                 onChange={handleScoreChange} 
+                viewMode={viewMode}
               />
               <InputCard 
                 id="b2" 
@@ -429,6 +462,7 @@ export default function App() {
                 data={currentScores.b2} 
                 average={bimesterAverages.b2} 
                 onChange={handleScoreChange} 
+                viewMode={viewMode}
               />
               <InputCard 
                 id="b3" 
@@ -436,6 +470,7 @@ export default function App() {
                 data={currentScores.b3} 
                 average={bimesterAverages.b3} 
                 onChange={handleScoreChange} 
+                viewMode={viewMode}
               />
               <InputCard 
                 id="b4" 
@@ -443,10 +478,10 @@ export default function App() {
                 data={currentScores.b4} 
                 average={bimesterAverages.b4} 
                 onChange={handleScoreChange} 
+                viewMode={viewMode}
               />
             </div>
 
-            {/* AI Feedback Section */}
             {aiResult && (
               <div className={`p-6 rounded-2xl border animate-fade-in ${
                 aiResult.status === 'error' 
@@ -483,11 +518,8 @@ export default function App() {
             )}
           </div>
 
-          {/* Right Column: Results & Charts */}
           <div className="space-y-6">
-            
             <div className="sticky top-6 space-y-4">
-              {/* Summary Card */}
               <div className={`p-6 rounded-2xl shadow-sm border transition-colors ${
                 isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
               }`}>
@@ -497,7 +529,6 @@ export default function App() {
                 </h2>
 
                 <div className="space-y-6">
-                  {/* Semester 1 */}
                   <div className={`flex justify-between items-center pb-4 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
                     <div>
                       <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Média 1º Semestre</p>
@@ -511,7 +542,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Semester 2 */}
                   <div className={`flex justify-between items-center pb-4 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
                     <div>
                       <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Média 2º Semestre</p>
@@ -525,103 +555,121 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Final Average */}
                   <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                     <div className="flex justify-between items-center mb-1">
                       <p className={`text-sm font-bold uppercase tracking-wide ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Média Final</p>
                       {finalAverage !== null && (
-                        <span className={`text-xs px-2 py-1 rounded font-bold ${
+                        <span className={`text-xs px-2 py-1 rounded-md font-bold ${
                           finalAverage >= PASSING_GRADE 
-                            ? (isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700') 
+                            ? (isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700')
                             : (isDarkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700')
                         }`}>
-                          {finalAverage >= PASSING_GRADE ? 'APROVADO' : 'RECUPERAÇÃO'}
+                          {finalAverage >= PASSING_GRADE ? 'Aprovado' : 'Reprovado'}
                         </span>
                       )}
                     </div>
-                    <div className="text-center py-2">
-                      <span className={`text-5xl font-extrabold ${
-                        finalAverage === null ? 'text-slate-600' : 
-                        finalAverage >= PASSING_GRADE ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                        {finalAverage ? finalAverage.toFixed(1) : '-'}
-                      </span>
+                    
+                    <div className="flex flex-col items-center">
+                       <span className={`text-4xl font-extrabold ${
+                          finalAverage === null ? 'text-slate-300 dark:text-slate-700' :
+                          finalAverage >= PASSING_GRADE ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                       }`}>
+                          {finalAverage !== null ? finalAverage.toFixed(1) : '-'}
+                       </span>
+                       
+                       <div className="w-8 h-1 bg-slate-200 dark:bg-slate-700 rounded-full my-3"></div>
+
+                       <p className={`text-xs text-center ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Mínimo para passar: {PASSING_GRADE.toFixed(1)}
+                       </p>
+
+                       {/* Pontos Faltantes (Final) */}
+                       {finalAverage !== null && finalAverage < PASSING_GRADE && (
+                         <div className="mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/30">
+                           <p className="text-xs font-bold text-red-600 dark:text-red-400 text-center">
+                             Faltam {((PASSING_GRADE - finalAverage) * 12).toFixed(1)} pontos escolares
+                           </p>
+                         </div>
+                       )}
+
+                       {/* Pontos Sobrando (Final) */}
+                       {finalAverage !== null && finalAverage >= PASSING_GRADE && (
+                         <div className="mt-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                           <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 text-center">
+                             Sobram {((finalAverage - PASSING_GRADE) * 12).toFixed(1)} pontos escolares
+                           </p>
+                         </div>
+                       )}
                     </div>
-                    <p className="text-center text-xs text-slate-500 mt-1">Mínimo para passar: {PASSING_GRADE.toFixed(1)}</p>
                   </div>
                 </div>
-
-                {/* Visual Chart */}
-                <div className="mt-8 h-48 w-full">
-                  <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">Evolução</p>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#334155' : '#e2e8f0'} />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{fontSize: 12, fill: isDarkMode ? '#94a3b8' : '#64748b'}} 
-                      />
-                      <YAxis 
-                        domain={[0, 10]} 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{fontSize: 12, fill: isDarkMode ? '#94a3b8' : '#64748b'}} 
-                        width={25}
-                      />
-                      <Tooltip 
-                        cursor={{fill: isDarkMode ? '#1e293b' : '#f1f5f9'}}
-                        contentStyle={{
-                          borderRadius: '8px', 
-                          border: 'none', 
-                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-                          color: isDarkMode ? '#f8fafc' : '#0f172a'
-                        }} 
-                      />
-                      <ReferenceLine y={PASSING_GRADE} stroke="#ef4444" strokeDasharray="3 3" />
-                      <Bar dataKey="grade" radius={[4, 4, 0, 0]}>
-                        {chartData.map((entry, index) => {
-                          let fillColor;
-                          if (entry.grade < 5) {
-                            fillColor = '#ef4444'; // Red for < 5
-                          } else if (entry.grade < 7) {
-                            fillColor = '#eab308'; // Yellow for 5 <= grade < 7
-                          } else {
-                            fillColor = '#22c55e'; // Green for >= 7
-                          }
-                          return <Cell key={`cell-${index}`} fill={fillColor} />;
-                        })}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
               </div>
 
-              {/* Legend Card - Dynamic Status */}
-              <div className={`px-6 py-4 rounded-2xl border transition-colors ${
+              {/* Status Legend */}
+              <div className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                 isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+              }`}>
+                 <div className={`w-3 h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.3)] ${status.color}`}></div>
+                 <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {status.text}
+                 </span>
+              </div>
+
+              {/* Chart */}
+              <div className={`p-6 rounded-2xl shadow-sm border h-80 transition-colors ${
                 isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
               }`}>
-                 <h3 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                   Status
-                 </h3>
-                 <div className="flex items-center gap-3">
-                    <span className={`w-3 h-3 rounded-full ${status.color}`}></span>
-                    <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {status.text}
-                    </span>
-                 </div>
+                <h3 className={`font-bold text-sm uppercase tracking-wide mb-6 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Evolução
+                </h3>
+                <ResponsiveContainer width="100%" height="85%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#334155' : '#e2e8f0'} />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }} 
+                      dy={10}
+                    />
+                     <YAxis 
+                      domain={[0, 10]} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}
+                      width={20}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: isDarkMode ? '#1e293b' : '#f1f5f9' }}
+                      contentStyle={{ 
+                        backgroundColor: isDarkMode ? '#0f172a' : '#fff', 
+                        borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+                        color: isDarkMode ? '#f1f5f9' : '#0f172a',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                      }}
+                    />
+                    <ReferenceLine y={PASSING_GRADE} stroke="#ef4444" strokeDasharray="3 3" />
+                    <Bar dataKey="grade" radius={[6, 6, 0, 0]}>
+                      {chartData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={
+                            entry.grade < 5 ? '#ef4444' : // Red
+                            entry.grade < 7 ? '#eab308' : // Yellow
+                            '#22c55e' // Green
+                          } 
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            </div>
-            
-          </div>
-        </main>
 
-        <footer className="mt-12 text-center text-slate-500 text-sm">
-          <p>Calculadora baseada no sistema TM, TB e TD.</p>
-          <p className="mt-1">© 2025</p>
-        </footer>
+            </div>
+          </div>
+
+        </main>
       </div>
     </div>
   );

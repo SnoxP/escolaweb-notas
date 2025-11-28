@@ -1,12 +1,12 @@
 import React from 'react';
-import { Calculator, Download, ExternalLink, TrendingUp, ChevronRight } from 'lucide-react';
+import { Calculator, ExternalLink, ChevronRight, FileText } from 'lucide-react';
 
 interface LandingPageProps {
   onEnterApp: () => void;
-  onImportClick: () => void;
+  onPartialImportClick: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onImportClick }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportClick }) => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       
@@ -14,8 +14,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onImportClick }) 
         
         {/* Hero Section */}
         <div className="text-center space-y-4">
-          <div className="inline-flex items-center justify-center p-4 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/20 mb-4">
-            <TrendingUp size={48} className="text-white" />
+          <div className="inline-flex items-center justify-center mb-6">
+            <img 
+              src="https://play-lh.googleusercontent.com/sLit3rYFhvsvIB1TjnXzPM44AfpP6-z-5CH8MFNn2IL_4fNzs3PN0pTHPnmI8Q2qiQ" 
+              alt="EscolaWeb Logo" 
+              className="w-24 h-24 object-contain drop-shadow-xl hover:scale-105 transition-transform duration-300 rounded-2xl" 
+            />
           </div>
           <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Notas da Escolaweb
@@ -29,6 +33,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onImportClick }) 
         <div className="grid gap-4 mt-8">
           
           <button 
+            onClick={onPartialImportClick}
+            className="group relative flex items-center justify-between p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md hover:border-emerald-500 dark:hover:border-emerald-500 transition-all duration-200 text-left"
+          >
+             <div className="flex items-center gap-4">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <FileText size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Notas Parciais</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Importar TM, TB e TD por bimestre</p>
+              </div>
+            </div>
+            <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-emerald-500 transition-colors" />
+          </button>
+
+          <button 
             onClick={onEnterApp}
             className="group relative flex items-center justify-between p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-500 dark:hover:border-blue-500 transition-all duration-200 text-left"
           >
@@ -37,27 +57,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onImportClick }) 
                 <Calculator size={24} />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Calculadora</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Preencher notas manualmente</p>
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Resultados Gerais</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Visualizar médias dos bimestres</p>
               </div>
             </div>
             <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-blue-500 transition-colors" />
-          </button>
-
-          <button 
-            onClick={onImportClick}
-            className="group relative flex items-center justify-between p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-500 dark:hover:border-indigo-500 transition-all duration-200 text-left"
-          >
-             <div className="flex items-center gap-4">
-              <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <Download size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Importar Notas</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Colar do site EscolaWeb (Ctrl+V)</p>
-              </div>
-            </div>
-            <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-indigo-500 transition-colors" />
           </button>
 
         </div>
@@ -75,8 +79,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onImportClick }) 
           </a>
         </div>
         
-        <div className="text-center text-xs text-slate-400 dark:text-slate-600 mt-12">
-           © 2025 Notas da Escolaweb • Versão 2.0
+        <div className="text-center mt-12 space-y-1">
+           <p className="text-xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Em desenvolvimento</p>
+           <p className="text-xs text-slate-400 dark:text-slate-600">Pode haver alguns erros durante o processo.</p>
         </div>
 
       </div>

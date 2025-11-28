@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { YearScores, BimesterAverages, AIAnalysisResult, SubjectMap } from "../types";
+import { YearScores, BimesterAverages, AIAnalysisResult, SubjectMap, BimesterKey } from "../types";
 
 const apiKey = process.env.API_KEY || '';
 
@@ -8,9 +8,12 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // List of subjects to scan for during bulk import
 // ATENÇÃO: Esta lista deve estar sincronizada com a do App.tsx
+// Removidas matérias genéricas (Matemática, Biologia) que possuem versões numeradas
 const KNOWN_SUBJECTS = [
   "Filosofia", "Geografia", "Artes", "Química", "Inglês", "Física",
-  "Matemática", "Biologia", "História", "Literatura", "Gramática",
+  "Matemática I", "Matemática II", "Matemática Fundamental",
+  "Biologia I", "Biologia II",
+  "História", "Literatura", "Gramática",
   "Interpretação de Texto", "Educação Física", "Redação", "Sociologia",
   "Espanhol", "Projeto de Vida"
 ];
@@ -89,7 +92,7 @@ export const analyzeGrades = async (
 /**
  * Parsing local ROBUSTO e SEQUENCIAL.
  */
-const localFastParse = (text: string, subject: string): YearScores | null => {
+const localFastParse = (text: string, subject: string, forceBimester?: BimesterKey | null): YearScores | null => {
   if (!text || !subject) return null;
 
   // 1. Normalização
@@ -98,14 +101,18 @@ const localFastParse = (text: string, subject: string): YearScores | null => {
   const normalizedSubject = normalize(subject);
 
   // 2. Definir variações do nome da matéria
-  let searchTerms = [normalizedSubject];
+  // Ordenar termos por tamanho (decrescente) ajuda a evitar que "Matemática" dê match em "Matemática II" incorretamente
+  let searchTerms = [];
   
   if (normalizedSubject === 'artes') searchTerms.push('arte');
-  if (normalizedSubject === 'ingles') searchTerms.push('lingua inglesa');
-  if (normalizedSubject === 'espanhol') searchTerms.push('lingua espanhola');
-  if (normalizedSubject === 'gramatica') searchTerms.push('lingua portuguesa');
-  if (normalizedSubject === 'interpretacao de texto') searchTerms.push('lingua portuguesa');
-  if (normalizedSubject.includes('portugues')) searchTerms.push('lingua portuguesa');
+  else if (normalizedSubject === 'ingles') searchTerms.push('lingua inglesa');
+  else if (normalizedSubject === 'espanhol') searchTerms.push('lingua espanhola');
+  else if (normalizedSubject === 'gramatica') searchTerms.push('lingua portuguesa'); // Fallback se não achar gramática específico
+  else if (normalizedSubject === 'interpretacao de texto') searchTerms.push('lingua portuguesa');
+  else if (normalizedSubject.includes('portugues')) searchTerms.push('lingua portuguesa');
+  
+  // Adiciona o termo normalizado como prioritário
+  searchTerms.unshift(normalizedSubject);
   
   // 3. Encontrar start index
   let startIndex = -1;
@@ -114,12 +121,29 @@ const localFastParse = (text: string, subject: string): YearScores | null => {
   for (const term of searchTerms) {
     let pos = cleanText.indexOf(term);
     
-    // Tratamento de colisão: "Física" dentro de "Educação Física"
+    // Tratamento de colisão
     while (pos !== -1) {
+      // 1. "Física" dentro de "Educação Física"
       const isPartOfEducation = term === 'fisica' && 
         cleanText.substring(Math.max(0, pos - 15), pos).includes('educacao');
       
-      if (!isPartOfEducation) {
+      // 2. "Matemática" dentro de "Matemática II" ou "Matemática I"
+      // Se estamos procurando "matematica" (genérico), mas o texto tem "matematica i" ou "matematica ii", devemos pular
+      // para não atribuir notas de Mat II para Mat I.
+      let isPartofRoman = false;
+      if (term === 'matematica' || term === 'biologia') {
+         // Verifica o que vem depois
+         const nextChars = cleanText.substring(pos + term.length, pos + term.length + 5).trim();
+         // Se começar com i ou ii ou fundamental, e não for o que estamos procurando exato
+         if (nextChars.startsWith('i') || nextChars.startsWith('v') || nextChars.includes('fundamental')) {
+             // Se o termo buscado não inclui esse sufixo, então é uma colisão
+             if (!term.includes('i') && !term.includes('fundamental')) {
+                 isPartofRoman = true;
+             }
+         }
+      }
+
+      if (!isPartOfEducation && !isPartofRoman) {
         startIndex = pos;
         foundTerm = term;
         break; 
@@ -133,10 +157,13 @@ const localFastParse = (text: string, subject: string): YearScores | null => {
   if (startIndex === -1) return null;
 
   // 4. Encontrar end index (próxima matéria)
+  // Adicionamos as matérias romanas aqui para servirem de "stop words" umas para as outras
   const allSubjects = [
-    "arte", "biologia", "educacao fisica", "filosofia", "fisica", 
-    "geografia", "historia", "literatura", "lingua espanhola", 
-    "lingua inglesa", "lingua portuguesa", "matematica", 
+    "arte", "biologia", "biologia i", "biologia ii", 
+    "educacao fisica", "filosofia", "fisica", 
+    "geografia", "historia", "literatura", 
+    "lingua espanhola", "lingua inglesa", "lingua portuguesa", 
+    "matematica", "matematica i", "matematica ii", "matematica fundamental",
     "projeto de vida", "quimica", "redacao", "sociologia"
   ];
 
@@ -161,30 +188,92 @@ const localFastParse = (text: string, subject: string): YearScores | null => {
 
   let sectionText = cleanText.slice(startIndex, endIndex);
 
-  // 4.5 REMOVER "Total X Semestre" para ignorar (pedido do usuário)
-  // Remove linhas ou trechos que contenham "total" seguido de "semestre"
-  // O regex remove "total" ... até o próximo número ou quebra de linha para evitar pegar o valor
+  // 4.5 REMOVER "Total X Semestre" para ignorar
   sectionText = sectionText.replace(/total\s*.*semestre.*(\n|$)/g, " ");
 
-  // 5. Extração
+  // 5. HELPER: Extrair valor
   const findValue = (labelRegex: RegExp): number | null => {
     const matchLabel = labelRegex.exec(sectionText);
-    
     if (!matchLabel) return null;
-
-    // Pega o texto a partir do fim do label
     const textAfterLabel = sectionText.slice(matchLabel.index + matchLabel[0].length);
-    
+
+    // CORREÇÃO CRÍTICA:
+    // Verifica se a nota é vazia (representada por "-" ou "- /")
+    const emptyMatch = textAfterLabel.match(/^\s*-\s*\//) || textAfterLabel.match(/^\s*-\s*(\n|$)/);
+    if (emptyMatch) {
+        return null; 
+    }
+
     // Procura o PRIMEIRO número (inteiro ou decimal com , ou .)
     const matchNumber = textAfterLabel.match(/(\d+([.,]\d+)?)/);
-    
     if (matchNumber) {
       return parseFloat(matchNumber[0].replace(',', '.'));
     }
     return null;
   };
 
-  // Extrair notas dos bimestres
+  const fmt = (val: number | null) => val !== null ? val.toFixed(2) : '';
+
+  // --- MODO DETALHADO (FORÇADO PELO USUÁRIO OU DETECÇÃO) ---
+  
+  if (forceBimester) {
+    const tmVal = findValue(/teste\s*mensal/);
+    const tbVal = findValue(/teste\s*bimestral/);
+    const tdVal = findValue(/teste\s*dirigido|trabalhos/);
+
+    const result: YearScores = {
+      b1: { tm: '', tb: '', td: '' },
+      b2: { tm: '', tb: '', td: '' },
+      b3: { tm: '', tb: '', td: '' },
+      b4: { tm: '', tb: '', td: '' }
+    };
+    
+    // Se encontrou algo, preenche. Se não, deixa vazio.
+    // Importante: Notas "0.0" devem ser importadas. Notas null/vazias não.
+    if (tmVal !== null || tbVal !== null || tdVal !== null) {
+        result[forceBimester] = {
+            tm: fmt(tmVal),
+            tb: fmt(tbVal),
+            td: fmt(tdVal)
+        };
+        return result;
+    }
+    // Se não encontrou NADA dessa matéria nesse bloco, retorna null para não sobrescrever com vazios
+    return null;
+  }
+
+  // --- DETECÇÃO DE MODO: DETALHADO (NOTAS PARCIAIS) VS GERAL ---
+  const hasDetailedInfo = /teste\s*mensal|teste\s*dirigido|teste\s*bimestral/i.test(sectionText);
+
+  if (hasDetailedInfo) {
+    let activeBimester = 1; 
+    if (cleanText.includes('4º bimestre') || cleanText.includes('4o bimestre')) activeBimester = 4;
+    else if (cleanText.includes('3º bimestre') || cleanText.includes('3o bimestre')) activeBimester = 3;
+    else if (cleanText.includes('2º bimestre') || cleanText.includes('2o bimestre')) activeBimester = 2;
+    else if (cleanText.includes('1º bimestre') || cleanText.includes('1o bimestre')) activeBimester = 1;
+
+    const tmVal = findValue(/teste\s*mensal/);
+    const tbVal = findValue(/teste\s*bimestral/);
+    const tdVal = findValue(/teste\s*dirigido|trabalhos/);
+
+    const result: YearScores = {
+      b1: { tm: '', tb: '', td: '' },
+      b2: { tm: '', tb: '', td: '' },
+      b3: { tm: '', tb: '', td: '' },
+      b4: { tm: '', tb: '', td: '' }
+    };
+
+    const targetKey = `b${activeBimester}` as keyof YearScores;
+    result[targetKey] = {
+      tm: fmt(tmVal),
+      tb: fmt(tbVal),
+      td: fmt(tdVal)
+    };
+    return result;
+  }
+
+  // --- MODO GERAL (Resultados Gerais - Apenas Médias) ---
+
   let v1 = findValue(/1[ºo°]?\s*bimestre/);
   let v2 = findValue(/2[ºo°]?\s*bimestre/);
   let v3 = findValue(/3[ºo°]?\s*bimestre/);
@@ -194,14 +283,11 @@ const localFastParse = (text: string, subject: string): YearScores | null => {
   const rec1 = findValue(/rec(uperacao)?\s*1[ºo°]?\s*semestre/);
   const rec2 = findValue(/rec(uperacao)?\s*2[ºo°]?\s*semestre/);
 
-  // APLICAR LÓGICA DE RECUPERAÇÃO:
-  // "o calculo dele é divido por 4 e somado no 2 bimestre" (para Rec 1º Sem)
-  // Estendendo lógica para 2º Semestre -> Soma no 4º Bimestre
+  // Lógica de recuperação
   if (rec1 !== null) {
     const bonus = rec1 / 4;
     v2 = (v2 || 0) + bonus;
   }
-
   if (rec2 !== null) {
     const bonus = rec2 / 4;
     v4 = (v4 || 0) + bonus;
@@ -209,9 +295,6 @@ const localFastParse = (text: string, subject: string): YearScores | null => {
 
   if (v1 === null && v2 === null && v3 === null && v4 === null) return null;
 
-  const fmt = (val: number | null) => val !== null ? val.toFixed(2) : '';
-
-  // Mapeia para TB (Teste Bimestral) pois é o formato de resultado geral
   return {
     b1: { tm: '', tb: fmt(v1), td: '' },
     b2: { tm: '', tb: fmt(v2), td: '' },
@@ -222,14 +305,14 @@ const localFastParse = (text: string, subject: string): YearScores | null => {
 
 /**
  * Função principal de Importação.
- * Agora percorre TODAS as matérias conhecidas e tenta extrair notas para cada uma.
+ * Agora aceita um bimester forçado opcional.
  */
-export const parseGradesFromText = async (text: string): Promise<SubjectMap> => {
+export const parseGradesFromText = async (text: string, forceBimester?: BimesterKey | null): Promise<SubjectMap> => {
   const results: SubjectMap = {};
   
   // Itera sobre todas as matérias conhecidas
   for (const subject of KNOWN_SUBJECTS) {
-    const scores = localFastParse(text, subject);
+    const scores = localFastParse(text, subject, forceBimester);
     if (scores) {
       results[subject] = scores;
     }
