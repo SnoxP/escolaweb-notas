@@ -57,20 +57,11 @@ export default function App() {
   const [showLanding, setShowLanding] = useState(true);
   const [viewMode, setViewMode] = useState<'simple' | 'detailed'>('simple');
 
-  const [subjectName, setSubjectName] = useState(() => {
-    return localStorage.getItem('subject_name') || '';
-  });
+  // Removido salvamento automático da matéria
+  const [subjectName, setSubjectName] = useState('');
 
-  // DB of all grades: Map<SubjectName, Scores>
-  const [allGrades, setAllGrades] = useState<SubjectMap>(() => {
-    const saved = localStorage.getItem('school_grades_db');
-    if (saved) return JSON.parse(saved);
-    
-    // Migration/Legacy fallback
-    const legacy = localStorage.getItem('school_grades');
-    if (legacy) return {}; 
-    return {};
-  });
+  // Removido salvamento automático das notas (DB)
+  const [allGrades, setAllGrades] = useState<SubjectMap>({});
 
   const [bimesterAverages, setBimesterAverages] = useState<BimesterAverages>({
     b1: null, b2: null, b3: null, b4: null
@@ -104,16 +95,6 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
-
-  useEffect(() => {
-    localStorage.setItem('subject_name', subjectName);
-  }, [subjectName]);
-
-  // Save entire DB whenever it changes
-  useEffect(() => {
-    localStorage.setItem('school_grades_db', JSON.stringify(allGrades));
-  }, [allGrades]);
-
 
   // Calculate Averages for the CURRENT displayed scores
   const calculateAvg = (s: { tm: string, tb: string, td: string }): number | null => {
