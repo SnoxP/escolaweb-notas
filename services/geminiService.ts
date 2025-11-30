@@ -138,10 +138,10 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
 
   // Estrutura de resultado acumulativo
   const result: YearScores = {
-    b1: { tm: '', tb: '', td: '', recuperacao: '' },
-    b2: { tm: '', tb: '', td: '', recuperacao: '' },
-    b3: { tm: '', tb: '', td: '', recuperacao: '' },
-    b4: { tm: '', tb: '', td: '', recuperacao: '' },
+    b1: { tm: '', tb: '', td: '', recuperacao: '', average: '' },
+    b2: { tm: '', tb: '', td: '', recuperacao: '', average: '' },
+    b3: { tm: '', tb: '', td: '', recuperacao: '', average: '' },
+    b4: { tm: '', tb: '', td: '', recuperacao: '', average: '' },
     finalResult: ''
   };
   
@@ -236,50 +236,49 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
       detectedBimester = forceBimester;
     } else {
       // --- Lógica de Detecção Inteligente ---
-      if (matches.length > 1) {
-        const seqIndex = index % 4; 
-        if (seqIndex === 0) detectedBimester = 'b1';
-        else if (seqIndex === 1) detectedBimester = 'b2';
-        else if (seqIndex === 2) detectedBimester = 'b3';
-        else if (seqIndex === 3) detectedBimester = 'b4';
-      } 
-      else {
-        if (/1[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b1';
-        else if (/2[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b2';
-        else if (/3[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b3';
-        else if (/4[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b4';
-        
-        if (!detectedBimester) {
-            const textBefore = cleanText.slice(0, match.startIndex);
-            const lastB1 = textBefore.lastIndexOf('1º bimestre');
-            const lastB2 = textBefore.lastIndexOf('2º bimestre');
-            const lastB3 = textBefore.lastIndexOf('3º bimestre');
-            const lastB4 = textBefore.lastIndexOf('4º bimestre');
+      // PRIORIDADE 1: Buscar cabeçalho EXPLÍCITO dentro do texto da seção
+      if (/1[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b1';
+      else if (/2[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b2';
+      else if (/3[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b3';
+      else if (/4[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b4';
+      
+      // PRIORIDADE 2: Buscar cabeçalho PRÓXIMO (Lookbehind) no texto geral
+      if (!detectedBimester) {
+          const textBefore = cleanText.slice(0, match.startIndex);
+          // Busca os cabeçalhos mais próximos para trás
+          const lastB1 = textBefore.lastIndexOf('1º bimestre');
+          const lastB2 = textBefore.lastIndexOf('2º bimestre');
+          const lastB3 = textBefore.lastIndexOf('3º bimestre');
+          const lastB4 = textBefore.lastIndexOf('4º bimestre');
 
-            const headers = [
-                { id: 'b1', idx: lastB1 }, 
-                { id: 'b2', idx: lastB2 }, 
-                { id: 'b3', idx: lastB3 }, 
-                { id: 'b4', idx: lastB4 }
-            ].sort((a, b) => b.idx - a.idx);
+          const headers = [
+              { id: 'b1', idx: lastB1 }, 
+              { id: 'b2', idx: lastB2 }, 
+              { id: 'b3', idx: lastB3 }, 
+              { id: 'b4', idx: lastB4 }
+          ].filter(h => h.idx !== -1).sort((a, b) => b.idx - a.idx); // Ordena pelo índice maior (mais próximo)
 
-            if (headers[0].idx !== -1) {
-                const validHeaders = headers.filter(h => h.idx !== -1);
-                if (validHeaders.length > 1) {
-                    const minIdx = Math.min(...validHeaders.map(h => h.idx));
-                    const maxIdx = Math.max(...validHeaders.map(h => h.idx));
-                    
-                    if (maxIdx - minIdx < 200) {
-                         detectedBimester = 'b1'; 
-                    } else {
-                        detectedBimester = headers[0].id as BimesterKey;
-                    }
-                } else {
-                    detectedBimester = headers[0].id as BimesterKey;
-                }
-            } else {
-                detectedBimester = 'b1';
-            }
+          if (headers.length > 0) {
+              const closest = headers[0];
+              // Se o cabeçalho estiver a uma distância razoável (ex: < 800 caracteres)
+              // isso evita pegar um cabeçalho muito antigo de outra tabela
+              if (match.startIndex - closest.idx < 800) {
+                  detectedBimester = closest.id as BimesterKey;
+              }
+          }
+      }
+
+      // PRIORIDADE 3: Fallback para Sequência (Apenas se não encontrou nada explícito)
+      if (!detectedBimester) {
+        if (matches.length > 1) {
+            const seqIndex = index % 4; 
+            if (seqIndex === 0) detectedBimester = 'b1';
+            else if (seqIndex === 1) detectedBimester = 'b2';
+            else if (seqIndex === 2) detectedBimester = 'b3';
+            else if (seqIndex === 3) detectedBimester = 'b4';
+        } else {
+            // Se só tem 1 match e nenhum cabeçalho, assume B1
+            detectedBimester = 'b1';
         }
       }
     }
@@ -324,7 +323,7 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
             hasAnyData = true;
         }
     } 
-    // MODO GERAL (Médias Finais apenas)
+    // MODO GERAL (Médias Finais apenas) - Salva em 'average'
     else {
         // Tenta pegar médias explicitamente listadas no texto
         const b1Avg = findValue(/1[ºo°]?\s*bimestre/);
@@ -332,10 +331,11 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
         const b3Avg = findValue(/3[ºo°]?\s*bimestre/);
         const b4Avg = findValue(/4[ºo°]?\s*bimestre/);
 
-        if (b1Avg !== null) { result.b1.tb = b1Avg; hasAnyData = true; }
-        if (b2Avg !== null) { result.b2.tb = b2Avg; hasAnyData = true; }
-        if (b3Avg !== null) { result.b3.tb = b3Avg; hasAnyData = true; }
-        if (b4Avg !== null) { result.b4.tb = b4Avg; hasAnyData = true; }
+        // ATENÇÃO: Agora salvamos em 'average' para não misturar com TB de notas parciais
+        if (b1Avg !== null) { result.b1.average = b1Avg; hasAnyData = true; }
+        if (b2Avg !== null) { result.b2.average = b2Avg; hasAnyData = true; }
+        if (b3Avg !== null) { result.b3.average = b3Avg; hasAnyData = true; }
+        if (b4Avg !== null) { result.b4.average = b4Avg; hasAnyData = true; }
     }
 
     // --- LÓGICA DE RECUPERAÇÃO SEMESTRAL (CROSS-BIMESTRE) ---
@@ -354,29 +354,17 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
     }
 
     // --- LÓGICA DE RESULTADO FINAL (ESCOLA) ---
-    // Estratégia: Encontrar todas as ocorrências de "Resultado/Total" e pegar a ÚLTIMA que seja um número válido isolado.
-    // Isso evita pegar "1" de "Resultado 1º Bimestre"
     
-    // Regex global para iterar sobre todas as ocorrências
-    // Procura por: Label, seguido de caracteres não-dígitos opcionais, seguido de número
     const finalResRegex = /(?:Resultado|Total|Média Final)[\s\S]*?(\d+(?:[.,]\d+)?)/gi;
     let matchFinal;
     let lastValidFinalResult = null;
     
-    // Reinicia o índice da regex se necessário (embora seja nova instância)
     finalResRegex.lastIndex = 0;
 
     while ((matchFinal = finalResRegex.exec(match.sectionText)) !== null) {
-        // matchFinal[0] contém o texto desde o label até o número
-        // matchFinal[1] é o número capturado
-        
-        // Verifica o caractere IMEDIATAMENTE após o número
-        // O índice do número dentro de match.sectionText
         const endOfNumberIndex = finalResRegex.lastIndex;
         const charAfter = match.sectionText[endOfNumberIndex];
         
-        // Se for seguido de indicador ordinal (º, °), PROVAVELMENTE é um cabeçalho (ex: Resultado 1º Bimestre)
-        // Então ignoramos.
         if (charAfter === 'º' || charAfter === '°' || charAfter === 'ª') {
             continue;
         }
@@ -398,7 +386,6 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
 
 /**
  * Função principal de Importação.
- * Agora aceita um bimester forçado opcional.
  */
 export const parseGradesFromText = async (text: string, forceBimester?: BimesterKey | null): Promise<SubjectMap> => {
   const results: SubjectMap = {};

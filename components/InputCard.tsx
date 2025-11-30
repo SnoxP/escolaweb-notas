@@ -1,6 +1,6 @@
 import React from 'react';
 import { BimesterKey, BimesterScores, ScoreKey } from '../types';
-import { Calculator, ClipboardList, GraduationCap, PenTool, RefreshCw } from 'lucide-react';
+import { Calculator, ClipboardList, GraduationCap, PenTool } from 'lucide-react';
 
 interface InputCardProps {
   id: BimesterKey;
@@ -26,13 +26,11 @@ const InputCard: React.FC<InputCardProps> = ({ id, title, data, average, onChang
   };
 
   const PASSING_GRADE = 7;
-  const POINTS_FACTOR = 3; // Alterado para 3 conforme solicitado (apenas para bimestres)
+  const POINTS_FACTOR = 3; 
 
   const getStatusColor = (avg: number | null) => {
     if (avg === null) return 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900';
     
-    // Light Mode: Use colored backgrounds (green-50/red-50) to restore original look
-    // Dark Mode: Use tinted backgrounds (green-950/red-950 with opacity)
     if (avg >= PASSING_GRADE) {
         return 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20';
     }
@@ -65,18 +63,20 @@ const InputCard: React.FC<InputCardProps> = ({ id, title, data, average, onChang
     }
   };
 
-  // Helper para mostrar recuperação
-  const renderRecoveryInfo = () => {
+  // Helper para mostrar recuperação (Agora como um Badge ao lado da nota)
+  const renderRecoveryBadge = () => {
     if (!data.recuperacao) return null;
     const recVal = parseFloat(data.recuperacao.replace(',', '.'));
     if (isNaN(recVal)) return null;
     const bonus = recVal / 4;
 
     return (
-      <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px]">
-         <span className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Recuperação</span>
-         <span className="font-bold text-blue-600 dark:text-blue-400">
-            {recVal.toFixed(1)} <span className="text-slate-400 font-normal">(+{bonus.toFixed(2)})</span>
+      <div className="inline-flex flex-col items-center bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-lg px-2 py-1 ml-2 shadow-sm">
+         <span className="text-[9px] font-bold text-blue-600 dark:text-blue-300 uppercase leading-none mb-0.5">
+            Rec
+         </span>
+         <span className="text-xs font-bold text-blue-700 dark:text-blue-200 leading-none">
+            {recVal.toFixed(1)} <span className="opacity-70 text-[10px]">(+{bonus.toFixed(2)})</span>
          </span>
       </div>
     );
@@ -91,35 +91,42 @@ const InputCard: React.FC<InputCardProps> = ({ id, title, data, average, onChang
           </span>
           {title}
         </h3>
+        
         {viewMode === 'detailed' && (
-          <div className="text-right">
-              <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider block">Média</span>
-              <span className={`text-2xl font-bold ${getScoreColor(average)}`}>
-                  {average !== null ? average.toFixed(1) : '-'}
-              </span>
-              {renderPointsInfo()}
+          <div className="text-right flex items-center">
+              {/* Se tiver recuperação, mostra ao lado da média no modo detalhado */}
+              {renderRecoveryBadge()}
+              
+              <div className="ml-3">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider block">Média</span>
+                  <span className={`text-2xl font-bold ${getScoreColor(average)}`}>
+                      {average !== null ? average.toFixed(1) : '-'}
+                  </span>
+                  {renderPointsInfo()}
+              </div>
           </div>
         )}
       </div>
 
       <div className="space-y-3">
         {viewMode === 'simple' ? (
-           /* SIMPLE MODE: Single Large Input mapped to TB (acting as Final Grade) */
+           /* SIMPLE MODE: Single Large Input mapped to AVERAGE (acting as Final Grade) */
            <div className="pt-2 pb-1 flex flex-col items-center">
               <label className="block text-center text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Nota do Bimestre</label>
-              <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="-"
-                  value={data.tb} // In simple mode, we use TB as the main grade storage
-                  onChange={(e) => {
-                      // When editing in simple mode, we update TB and CLEAR others to ensure Average == TB
-                      handleChange('tb')(e);
-                      onChange(id, 'tm', '');
-                      onChange(id, 'td', '');
-                  }}
-                  className={`block w-full text-center text-4xl font-bold bg-transparent border-b-2 border-slate-300 dark:border-slate-700 focus:border-blue-500 focus:ring-0 outline-none transition-colors ${getScoreColor(average)} placeholder-slate-300 dark:placeholder-slate-700`}
-              />
+              
+              <div className="flex items-center gap-2 justify-center w-full">
+                  <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="-"
+                      value={data.average || ''} 
+                      onChange={handleChange('average')}
+                      className={`block w-24 text-center text-4xl font-bold bg-transparent border-b-2 border-slate-300 dark:border-slate-700 focus:border-blue-500 focus:ring-0 outline-none transition-colors ${getScoreColor(average)} placeholder-slate-300 dark:placeholder-slate-700`}
+                  />
+                  {/* No modo simples, mostra a recuperação ao lado do input principal se existir */}
+                  {renderRecoveryBadge()}
+              </div>
+
               {renderPointsInfo()}
            </div>
         ) : (
@@ -180,10 +187,6 @@ const InputCard: React.FC<InputCardProps> = ({ id, title, data, average, onChang
             </div>
            </>
         )}
-        
-        {/* Espacinho da Recuperação */}
-        {renderRecoveryInfo()}
-        
       </div>
     </div>
   );

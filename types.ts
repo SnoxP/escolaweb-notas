@@ -3,6 +3,7 @@ export interface BimesterScores {
   tb: string;
   td: string;
   recuperacao?: string; // Nota bruta da recuperação semestral
+  average?: string; // Nota de Resultado Geral (Importada ou Manual)
 }
 
 export interface YearScores {
@@ -28,7 +29,7 @@ export interface SemesterAverages {
 }
 
 export type BimesterKey = 'b1' | 'b2' | 'b3' | 'b4';
-export type ScoreKey = 'tm' | 'tb' | 'td' | 'recuperacao';
+export type ScoreKey = 'tm' | 'tb' | 'td' | 'recuperacao' | 'average';
 
 export interface AIAnalysisResult {
   message: string;

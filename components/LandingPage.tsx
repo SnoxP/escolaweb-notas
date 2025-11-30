@@ -35,8 +35,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
 
   const changelog = [
     {
-      version: '2.06',
+      version: '2.08',
       date: new Date(), // Agora
+      changes: [
+        'Correção crítica na detecção de bimestres: agora prioriza nomes explícitos (ex: "4º Bimestre") em vez da ordem de aparição, corrigindo notas trocadas.'
+      ]
+    },
+    {
+      version: '2.07',
+      date: new Date(Date.now() - ONE_DAY_MS * 0.1), // Hoje cedo
+      changes: [
+        'Destaque visual (selo) para a "Nota Oficial da Escola" no resumo anual.',
+        'Nota de Recuperação agora aparece em destaque ao lado da média do bimestre.'
+      ]
+    },
+    {
+      version: '2.06',
+      date: new Date(Date.now() - ONE_DAY_MS * 1), // Ontem
       changes: [
         'Refinamento completo da lógica de cálculo (Médias Semestrais e Final).',
         'Visualização da "Nota Oficial da Escola" e Total de Pontos importados.',
@@ -45,7 +60,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.05',
-      date: new Date(Date.now() - ONE_DAY_MS * 0.1), // Hoje, um pouco antes
+      date: new Date(Date.now() - ONE_DAY_MS * 1.2), 
       changes: [
         'Ajuste no Déficit Anual: Notas acima da média agora abatem a dívida de pontos.',
         'Refinamentos na interface de cálculo final.'
@@ -53,7 +68,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.04',
-      date: new Date(Date.now() - ONE_DAY_MS * 1), // Ontem
+      date: new Date(Date.now() - ONE_DAY_MS * 2), 
       changes: [
         'Cálculo de Prova Final: Exibe nota necessária + pontos faltantes.',
         'Ajuste na interface de Resultados Finais.'
@@ -61,7 +76,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.03',
-      date: new Date(Date.now() - ONE_DAY_MS * 1.2), // Ontem
+      date: new Date(Date.now() - ONE_DAY_MS * 2.2), 
       changes: [
         'Correção no cálculo da Prova Final (Pontos Faltantes).',
         'Melhoria na detecção de Recuperação Semestral.',
@@ -69,7 +84,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.02',
-      date: new Date(Date.now() - ONE_DAY_MS * 2), // Anteontem
+      date: new Date(Date.now() - ONE_DAY_MS * 3), 
       changes: [
         'Cálculo de Recuperação Semestral (Nota/4) integrado.',
         'Visualização da nota de recuperação no rodapé do card.',
@@ -78,7 +93,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.01',
-      date: new Date(Date.now() - ONE_DAY_MS * 2.2), // Anteontem
+      date: new Date(Date.now() - ONE_DAY_MS * 3.2), 
       changes: [
         'Unificação de matérias (Matemática I/II → Matemática).',
         'Novo Tutorial interativo de uso.',
@@ -87,7 +102,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.00',
-      date: new Date(Date.now() - ONE_DAY_MS * 3), // 3 dias atrás
+      date: new Date(Date.now() - ONE_DAY_MS * 4), 
       changes: [
         'Novo Design System (Dark/Light Mode).',
         'Integração com IA Gemini para dicas de estudo.',

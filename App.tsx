@@ -10,7 +10,7 @@ import {
   ReferenceLine,
   Cell
 } from 'recharts';
-import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft, Eye, List, HelpCircle } from 'lucide-react';
+import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft, Eye, List, HelpCircle, School } from 'lucide-react';
 import InputCard from './components/InputCard';
 import ImportModal from './components/ImportModal';
 import Menu from './components/Menu';
@@ -20,10 +20,10 @@ import { YearScores, BimesterAverages, SemesterAverages, BimesterKey, ScoreKey, 
 import { analyzeGrades } from './services/geminiService';
 
 const INITIAL_SCORES: YearScores = {
-  b1: { tm: '', tb: '', td: '', recuperacao: '' },
-  b2: { tm: '', tb: '', td: '', recuperacao: '' },
-  b3: { tm: '', tb: '', td: '', recuperacao: '' },
-  b4: { tm: '', tb: '', td: '', recuperacao: '' },
+  b1: { tm: '', tb: '', td: '', recuperacao: '', average: '' },
+  b2: { tm: '', tb: '', td: '', recuperacao: '', average: '' },
+  b3: { tm: '', tb: '', td: '', recuperacao: '', average: '' },
+  b4: { tm: '', tb: '', td: '', recuperacao: '', average: '' },
   finalResult: ''
 };
 
@@ -109,14 +109,17 @@ export default function App() {
     const tb = parseScore(s.tb);
     const td = parseScore(s.td);
     
-    // Cálculo Padrão (Média dos 3 campos)
-    const values = [tm, tb, td].filter(v => !isNaN(v));
+    // Check if partial notes exist
+    const partialValues = [tm, tb, td].filter(v => !isNaN(v));
     
-    if (values.length === 0) return null;
-    
-    let avg = values.reduce((acc, curr) => acc + curr, 0) / values.length;
-
-    return avg;
+    if (partialValues.length > 0) {
+        // PRIORIDADE 1: Se existirem notas parciais (TM, TB, TD), calcula a média delas
+        return partialValues.reduce((acc, curr) => acc + curr, 0) / partialValues.length;
+    } else {
+        // PRIORIDADE 2: Se não houver notas parciais, usa a Média Geral (Importada ou Manual)
+        const generalAvg = parseScore(s.average);
+        return isNaN(generalAvg) ? null : generalAvg;
+    }
   };
 
   useEffect(() => {
@@ -135,36 +138,33 @@ export default function App() {
     };
 
     // --- Calculate Semester 1 Average ---
-    // Regra: Média(B1, B2) + (Recuperação / 4)
+    // Regra: ((Média(B1, B2)) + (Recuperação / 4))
+    // 1. Calcula a média dos bimestres
     let sem1 = null;
     const validB1B2 = [b1, b2].filter(v => v !== null) as number[];
     
     if (validB1B2.length > 0) {
-      // 1. Calcula a média simples dos bimestres disponíveis
       const rawAvg = validB1B2.reduce((a, b) => a + b, 0) / validB1B2.length;
       
-      // 2. Busca nota de recuperação (armazenada no B2)
+      // 2. Adiciona o bônus da recuperação (Nota / 4) à média do semestre
       const rec1 = parseRec(currentScores.b2.recuperacao);
       const bonus1 = rec1 / 4;
       
-      // 3. Soma o bônus à média do semestre
       sem1 = Math.min(10, rawAvg + bonus1);
     }
 
     // --- Calculate Semester 2 Average ---
-    // Regra: Média(B3, B4) + (Recuperação / 4)
+    // Regra: ((Média(B3, B4)) + (Recuperação / 4))
     let sem2 = null;
     const validB3B4 = [b3, b4].filter(v => v !== null) as number[];
     
     if (validB3B4.length > 0) {
-      // 1. Calcula a média simples dos bimestres disponíveis
       const rawAvg = validB3B4.reduce((a, b) => a + b, 0) / validB3B4.length;
       
-      // 2. Busca nota de recuperação (armazenada no B4)
+      // 2. Adiciona o bônus da recuperação (Nota / 4) à média do semestre
       const rec2 = parseRec(currentScores.b4.recuperacao);
       const bonus2 = rec2 / 4;
       
-      // 3. Soma o bônus à média do semestre
       sem2 = Math.min(10, rawAvg + bonus2);
     }
 
@@ -282,14 +282,10 @@ export default function App() {
   const PASSING_GRADE = 7.0;
 
   // Calcula a soma dos pontos faltantes (Déficit) para o Resumo Anual.
-  // Regra: Somatório dos déficits/superávits de cada bimestre (Nota vs 7.0) * 3
   const totalBimesterDeficit = useMemo(() => {
     const bimesters = [bimesterAverages.b1, bimesterAverages.b2, bimesterAverages.b3, bimesterAverages.b4];
     return bimesters.reduce((acc, avg) => {
         if (avg !== null) {
-            // (7 - avg) * 3
-            // Ex: Nota 6 -> (7-6)*3 = 3 pts (Déficit)
-            // Ex: Nota 8 -> (7-8)*3 = -3 pts (Superávit/Compensação)
             return acc + ((PASSING_GRADE - avg) * 3);
         }
         return acc;
@@ -298,11 +294,11 @@ export default function App() {
 
   // Status Logic
   const getSystemStatus = () => {
-    // FIX: Iterate explicitly over bimesters to avoid 'finalResult' string causing trim() error
+    // FIX: Iterate explicitly over bimesters
     const bimesters = [currentScores.b1, currentScores.b2, currentScores.b3, currentScores.b4];
     
     const hasAnyInput = bimesters.some(b => 
-      (b.tm || '').trim() !== '' || (b.tb || '').trim() !== '' || (b.td || '').trim() !== ''
+      (b.tm || '').trim() !== '' || (b.tb || '').trim() !== '' || (b.td || '').trim() !== '' || (b.average || '').trim() !== ''
     );
     
     const hasAnyValidAverage = 
@@ -633,16 +629,17 @@ export default function App() {
                           {finalAverage !== null ? finalAverage.toFixed(1) : '-'}
                        </span>
 
-                       {/* Nota Oficial da Escola (Importada) */}
+                       {/* Nota Oficial da Escola (Importada) - AGORA COM CONTRASTE */}
                        {currentScores.finalResult && (
-                         <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
-                           (Escola: {currentScores.finalResult})
-                         </span>
+                         <div className="mt-2 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/40 rounded-full border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                           <School size={12} />
+                           Escola: {currentScores.finalResult}
+                         </div>
                        )}
 
                        {/* Total de Pontos Calculado */}
                        {finalAverage !== null && (
-                         <span className="text-[10px] text-slate-400 dark:text-slate-600 mt-1 font-medium">
+                         <span className="text-[10px] text-slate-400 dark:text-slate-600 mt-2 font-medium">
                            Total: {(finalAverage * 4).toFixed(0)} pts
                          </span>
                        )}
