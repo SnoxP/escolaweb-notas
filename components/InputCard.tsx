@@ -1,6 +1,6 @@
 import React from 'react';
 import { BimesterKey, BimesterScores, ScoreKey } from '../types';
-import { Calculator, ClipboardList, GraduationCap, PenTool } from 'lucide-react';
+import { Calculator, ClipboardList, GraduationCap, PenTool, RefreshCw } from 'lucide-react';
 
 interface InputCardProps {
   id: BimesterKey;
@@ -65,6 +65,23 @@ const InputCard: React.FC<InputCardProps> = ({ id, title, data, average, onChang
     }
   };
 
+  // Helper para mostrar recuperação
+  const renderRecoveryInfo = () => {
+    if (!data.recuperacao) return null;
+    const recVal = parseFloat(data.recuperacao.replace(',', '.'));
+    if (isNaN(recVal)) return null;
+    const bonus = recVal / 4;
+
+    return (
+      <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px]">
+         <span className="text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Recuperação</span>
+         <span className="font-bold text-blue-600 dark:text-blue-400">
+            {recVal.toFixed(1)} <span className="text-slate-400 font-normal">(+{bonus.toFixed(2)})</span>
+         </span>
+      </div>
+    );
+  };
+
   return (
     <div className={`p-5 rounded-2xl border shadow-sm transition-all duration-300 ${getStatusColor(average)}`}>
       <div className="flex justify-between items-center mb-4">
@@ -88,7 +105,7 @@ const InputCard: React.FC<InputCardProps> = ({ id, title, data, average, onChang
       <div className="space-y-3">
         {viewMode === 'simple' ? (
            /* SIMPLE MODE: Single Large Input mapped to TB (acting as Final Grade) */
-           <div className="pt-2 pb-4 flex flex-col items-center">
+           <div className="pt-2 pb-1 flex flex-col items-center">
               <label className="block text-center text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Nota do Bimestre</label>
               <input
                   type="text"
@@ -163,6 +180,10 @@ const InputCard: React.FC<InputCardProps> = ({ id, title, data, average, onChang
             </div>
            </>
         )}
+        
+        {/* Espacinho da Recuperação */}
+        {renderRecoveryInfo()}
+        
       </div>
     </div>
   );

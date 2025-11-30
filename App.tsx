@@ -20,10 +20,11 @@ import { YearScores, BimesterAverages, SemesterAverages, BimesterKey, ScoreKey, 
 import { analyzeGrades } from './services/geminiService';
 
 const INITIAL_SCORES: YearScores = {
-  b1: { tm: '', tb: '', td: '' },
-  b2: { tm: '', tb: '', td: '' },
-  b3: { tm: '', tb: '', td: '' },
-  b4: { tm: '', tb: '', td: '' },
+  b1: { tm: '', tb: '', td: '', recuperacao: '' },
+  b2: { tm: '', tb: '', td: '', recuperacao: '' },
+  b3: { tm: '', tb: '', td: '', recuperacao: '' },
+  b4: { tm: '', tb: '', td: '', recuperacao: '' },
+  finalResult: ''
 };
 
 // Lista unificada de matérias
@@ -97,8 +98,8 @@ export default function App() {
   }, [isDarkMode]);
 
   // Calculate Averages for the CURRENT displayed scores
-  const calculateAvg = (s: { tm: string, tb: string, td: string }): number | null => {
-    const parseScore = (val: string) => {
+  const calculateAvg = (s: BimesterScores, bimesterId: string): number | null => {
+    const parseScore = (val: string | undefined) => {
       if (!val) return NaN;
       const normalized = val.replace(',', '.');
       return parseFloat(normalized);
@@ -108,29 +109,72 @@ export default function App() {
     const tb = parseScore(s.tb);
     const td = parseScore(s.td);
     
+    // Cálculo Padrão (Média dos 3 campos)
     const values = [tm, tb, td].filter(v => !isNaN(v));
     
     if (values.length === 0) return null;
-    const sum = values.reduce((acc, curr) => acc + curr, 0);
-    return sum / values.length;
+    
+    let avg = values.reduce((acc, curr) => acc + curr, 0) / values.length;
+
+    return avg;
   };
 
   useEffect(() => {
-    const b1 = calculateAvg(currentScores.b1);
-    const b2 = calculateAvg(currentScores.b2);
-    const b3 = calculateAvg(currentScores.b3);
-    const b4 = calculateAvg(currentScores.b4);
+    const b1 = calculateAvg(currentScores.b1, 'b1');
+    const b2 = calculateAvg(currentScores.b2, 'b2');
+    const b3 = calculateAvg(currentScores.b3, 'b3');
+    const b4 = calculateAvg(currentScores.b4, 'b4');
 
     setBimesterAverages({ b1, b2, b3, b4 });
 
-    setSemesterAverages({ 
-      sem1: (b1 !== null && b2 !== null) ? (b1 + b2) / 2 : null,
-      sem2: (b3 !== null && b4 !== null) ? (b3 + b4) / 2 : null
-    });
+    // Helper para parsear notas de recuperação
+    const parseRec = (val: string | undefined) => {
+      if (!val) return 0;
+      const parsed = parseFloat(val.replace(',', '.'));
+      return isNaN(parsed) ? 0 : parsed;
+    };
 
-    const validBimesters = [b1, b2, b3, b4].filter(v => v !== null) as number[];
-    if (validBimesters.length > 0) {
-      setFinalAverage(validBimesters.reduce((a, b) => a + b, 0) / validBimesters.length);
+    // --- Calculate Semester 1 Average ---
+    // Regra: Média(B1, B2) + (Recuperação / 4)
+    let sem1 = null;
+    const validB1B2 = [b1, b2].filter(v => v !== null) as number[];
+    
+    if (validB1B2.length > 0) {
+      // 1. Calcula a média simples dos bimestres disponíveis
+      const rawAvg = validB1B2.reduce((a, b) => a + b, 0) / validB1B2.length;
+      
+      // 2. Busca nota de recuperação (armazenada no B2)
+      const rec1 = parseRec(currentScores.b2.recuperacao);
+      const bonus1 = rec1 / 4;
+      
+      // 3. Soma o bônus à média do semestre
+      sem1 = Math.min(10, rawAvg + bonus1);
+    }
+
+    // --- Calculate Semester 2 Average ---
+    // Regra: Média(B3, B4) + (Recuperação / 4)
+    let sem2 = null;
+    const validB3B4 = [b3, b4].filter(v => v !== null) as number[];
+    
+    if (validB3B4.length > 0) {
+      // 1. Calcula a média simples dos bimestres disponíveis
+      const rawAvg = validB3B4.reduce((a, b) => a + b, 0) / validB3B4.length;
+      
+      // 2. Busca nota de recuperação (armazenada no B4)
+      const rec2 = parseRec(currentScores.b4.recuperacao);
+      const bonus2 = rec2 / 4;
+      
+      // 3. Soma o bônus à média do semestre
+      sem2 = Math.min(10, rawAvg + bonus2);
+    }
+
+    setSemesterAverages({ sem1, sem2 });
+
+    // Final Average: Average of the two semesters
+    // Regra: (Sem1 + Sem2) / 2
+    const validSems = [sem1, sem2].filter(v => v !== null) as number[];
+    if (validSems.length > 0) {
+      setFinalAverage(validSems.reduce((a, b) => a + b, 0) / validSems.length);
     } else {
       setFinalAverage(null);
     }
@@ -177,25 +221,18 @@ export default function App() {
 
         nextState[subject] = {
           b1: {
-            tm: newScores.b1.tm || oldScores.b1.tm,
-            tb: newScores.b1.tb || oldScores.b1.tb,
-            td: newScores.b1.td || oldScores.b1.td,
+            ...oldScores.b1, ...newScores.b1
           },
           b2: {
-            tm: newScores.b2.tm || oldScores.b2.tm,
-            tb: newScores.b2.tb || oldScores.b2.tb,
-            td: newScores.b2.td || oldScores.b2.td,
+            ...oldScores.b2, ...newScores.b2
           },
           b3: {
-            tm: newScores.b3.tm || oldScores.b3.tm,
-            tb: newScores.b3.tb || oldScores.b3.tb,
-            td: newScores.b3.td || oldScores.b3.td,
+            ...oldScores.b3, ...newScores.b3
           },
           b4: {
-            tm: newScores.b4.tm || oldScores.b4.tm,
-            tb: newScores.b4.tb || oldScores.b4.tb,
-            td: newScores.b4.td || oldScores.b4.td,
+            ...oldScores.b4, ...newScores.b4
           },
+          finalResult: newScores.finalResult || oldScores.finalResult
         };
       });
       return nextState;
@@ -244,11 +281,30 @@ export default function App() {
 
   const PASSING_GRADE = 7.0;
 
+  // Calcula a soma dos pontos faltantes (Déficit) para o Resumo Anual.
+  // Regra: Somatório dos déficits/superávits de cada bimestre (Nota vs 7.0) * 3
+  const totalBimesterDeficit = useMemo(() => {
+    const bimesters = [bimesterAverages.b1, bimesterAverages.b2, bimesterAverages.b3, bimesterAverages.b4];
+    return bimesters.reduce((acc, avg) => {
+        if (avg !== null) {
+            // (7 - avg) * 3
+            // Ex: Nota 6 -> (7-6)*3 = 3 pts (Déficit)
+            // Ex: Nota 8 -> (7-8)*3 = -3 pts (Superávit/Compensação)
+            return acc + ((PASSING_GRADE - avg) * 3);
+        }
+        return acc;
+    }, 0);
+  }, [bimesterAverages]);
+
   // Status Logic
   const getSystemStatus = () => {
-    const hasAnyInput = (Object.values(currentScores) as BimesterScores[]).some(b => 
-      b.tm.trim() !== '' || b.tb.trim() !== '' || b.td.trim() !== ''
+    // FIX: Iterate explicitly over bimesters to avoid 'finalResult' string causing trim() error
+    const bimesters = [currentScores.b1, currentScores.b2, currentScores.b3, currentScores.b4];
+    
+    const hasAnyInput = bimesters.some(b => 
+      (b.tm || '').trim() !== '' || (b.tb || '').trim() !== '' || (b.td || '').trim() !== ''
     );
+    
     const hasAnyValidAverage = 
       bimesterAverages.b1 !== null || 
       bimesterAverages.b2 !== null || 
@@ -576,6 +632,20 @@ export default function App() {
                        }`}>
                           {finalAverage !== null ? finalAverage.toFixed(1) : '-'}
                        </span>
+
+                       {/* Nota Oficial da Escola (Importada) */}
+                       {currentScores.finalResult && (
+                         <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
+                           (Escola: {currentScores.finalResult})
+                         </span>
+                       )}
+
+                       {/* Total de Pontos Calculado */}
+                       {finalAverage !== null && (
+                         <span className="text-[10px] text-slate-400 dark:text-slate-600 mt-1 font-medium">
+                           Total: {(finalAverage * 4).toFixed(0)} pts
+                         </span>
+                       )}
                        
                        <div className="w-8 h-1 bg-slate-200 dark:bg-slate-700 rounded-full my-3"></div>
 
@@ -585,9 +655,12 @@ export default function App() {
 
                        {/* Pontos Faltantes (Final) */}
                        {finalAverage !== null && finalAverage < PASSING_GRADE && (
-                         <div className="mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/30">
-                           <p className="text-xs font-bold text-red-600 dark:text-red-400 text-center">
-                             Faltam {((PASSING_GRADE - finalAverage) * 12).toFixed(1)} pontos escolares
+                         <div className="mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/30 flex flex-col gap-1 w-full">
+                           <p className="text-sm font-bold text-red-600 dark:text-red-400 text-center">
+                             Precisa tirar {(10 - finalAverage).toFixed(1)} na Prova Final
+                           </p>
+                           <p className="text-[10px] text-red-500 dark:text-red-400/80 text-center uppercase tracking-wide font-semibold">
+                             Déficit Anual: {totalBimesterDeficit.toFixed(1)} pts
                            </p>
                          </div>
                        )}
@@ -596,7 +669,7 @@ export default function App() {
                        {finalAverage !== null && finalAverage >= PASSING_GRADE && (
                          <div className="mt-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
                            <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 text-center">
-                             Sobram {((finalAverage - PASSING_GRADE) * 12).toFixed(1)} pontos escolares
+                             Sobram {((finalAverage - PASSING_GRADE) * 4).toFixed(1)} pontos escolares
                            </p>
                          </div>
                        )}

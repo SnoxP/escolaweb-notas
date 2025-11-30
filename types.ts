@@ -2,6 +2,7 @@ export interface BimesterScores {
   tm: string; // Storing as string to handle empty inputs gracefully
   tb: string;
   td: string;
+  recuperacao?: string; // Nota bruta da recuperação semestral
 }
 
 export interface YearScores {
@@ -9,6 +10,7 @@ export interface YearScores {
   b2: BimesterScores;
   b3: BimesterScores;
   b4: BimesterScores;
+  finalResult?: string; // Nota final arredondada fornecida pela escola
 }
 
 export type SubjectMap = Record<string, YearScores>;
@@ -26,7 +28,7 @@ export interface SemesterAverages {
 }
 
 export type BimesterKey = 'b1' | 'b2' | 'b3' | 'b4';
-export type ScoreKey = 'tm' | 'tb' | 'td';
+export type ScoreKey = 'tm' | 'tb' | 'td' | 'recuperacao';
 
 export interface AIAnalysisResult {
   message: string;

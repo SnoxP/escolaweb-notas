@@ -126,7 +126,6 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
   }
   
   // Lista de todas as matérias (incluindo as antigas) para servir de "Stop Words"
-  // Isso garante que o parser saiba onde parar mesmo se encontrar um nome antigo
   const allSubjects = [
     "arte", "biologia", "biologia i", "biologia ii", 
     "educacao fisica", "filosofia", "fisica", 
@@ -139,10 +138,11 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
 
   // Estrutura de resultado acumulativo
   const result: YearScores = {
-    b1: { tm: '', tb: '', td: '' },
-    b2: { tm: '', tb: '', td: '' },
-    b3: { tm: '', tb: '', td: '' },
-    b4: { tm: '', tb: '', td: '' }
+    b1: { tm: '', tb: '', td: '', recuperacao: '' },
+    b2: { tm: '', tb: '', td: '', recuperacao: '' },
+    b3: { tm: '', tb: '', td: '', recuperacao: '' },
+    b4: { tm: '', tb: '', td: '', recuperacao: '' },
+    finalResult: ''
   };
   
   // Array para armazenar todas as ocorrências encontradas
@@ -165,16 +165,9 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
       
       // Tratamento de colisão e falso positivos
       while (pos !== -1) {
-        
-        // Check 1: "Educação Física" vs "Física"
         const isPartOfEducation = term === 'fisica' && 
           cleanText.substring(Math.max(0, pos - 15), pos).includes('educacao');
         
-        // Check 2: Word Boundary (Crucial para "Matemática I" vs "Matemática II")
-        // Verifica se o caractere APÓS o termo é uma letra ou número, o que indicaria que o termo continua
-        // Mas se estivermos procurando por "Matematica" (genérico) e acharmos "Matematica I", devemos aceitar?
-        // A lógica de searchTerms coloca os mais específicos (I, II) também na lista se necessário.
-        // Se a busca for "Matematica" e acharmos "Matematica", ok.
         const charAfter = cleanText[pos + term.length];
         const isSubstring = charAfter && /[a-z0-9]/i.test(charAfter);
 
@@ -198,7 +191,7 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
     // Determinar FIM da seção (início da próxima matéria)
     let sectionEnd = cleanText.length;
     for (const sub of allSubjects) {
-      // Ignora a própria matéria se encontrada logo no início (ex: título repetido)
+      // Ignora a própria matéria se encontrada logo no início
       if (cleanText.substring(sectionStart, sectionStart + foundTermLength + 5).includes(sub)) continue; 
       
       let idx = cleanText.indexOf(sub, sectionStart + foundTermLength);
@@ -207,13 +200,11 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
       if (idx !== -1 && sub === 'fisica') {
          const isFakePhysics = cleanText.substring(Math.max(0, idx - 15), idx).includes('educacao');
          if (isFakePhysics) {
-             // Tenta achar a próxima "Física" real
              idx = cleanText.indexOf(sub, idx + 1);
          }
       }
 
       if (idx !== -1 && idx < sectionEnd) {
-        // Verifica boundary também para o stop word
         const charAfterStop = cleanText[idx + sub.length];
         const isStopSubstring = charAfterStop && /[a-z0-9]/i.test(charAfterStop);
         
@@ -224,16 +215,12 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
     }
 
     let sectionText = cleanText.slice(sectionStart, sectionEnd);
-    // Limpeza extra para evitar pegar cabeçalhos repetidos de forma errada
-    sectionText = sectionText.replace(/total\s*.*semestre.*(\n|$)/g, " ");
     
     matches.push({
       sectionText,
       startIndex: sectionStart
     });
     
-    // Atualiza ponteiro para buscar próxima ocorrência
-    // Se achamos "Matemática I", avançamos. A próxima pode ser "Matemática II" (se estivermos unificando).
     currentPos = sectionEnd; 
   }
 
@@ -249,29 +236,19 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
       detectedBimester = forceBimester;
     } else {
       // --- Lógica de Detecção Inteligente ---
-      
-      // A) Se tivermos múltiplas ocorrências VÁLIDAS, assumimos SEQUÊNCIA
-      // OBS: Se unificamos "Mat I" e "Mat II", podemos ter 8 ocorrências se o cara colou tudo.
-      // Nesse caso, o código vai tentar preencher B1..B4 repetidamente.
-      // Como o objeto `result` é acumulativo, a segunda ocorrência de B1 vai sobrescrever a primeira.
-      // Isso é o comportamento desejado se quisermos apenas "uma" nota (a última válida encontrada).
       if (matches.length > 1) {
-        // Usa módulo para lidar com múltiplas matérias unificadas (ex: Mat I 4 bims + Mat II 4 bims = 8 itens)
         const seqIndex = index % 4; 
         if (seqIndex === 0) detectedBimester = 'b1';
         else if (seqIndex === 1) detectedBimester = 'b2';
         else if (seqIndex === 2) detectedBimester = 'b3';
         else if (seqIndex === 3) detectedBimester = 'b4';
       } 
-      // B) Ocorrência única: Tenta detectar pelo cabeçalho
       else {
-        // Tenta achar "Xº Bimestre" DENTRO da seção (prioridade máxima)
         if (/1[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b1';
         else if (/2[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b2';
         else if (/3[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b3';
         else if (/4[ºo°]?\s*bimestre/.test(match.sectionText)) detectedBimester = 'b4';
         
-        // Se não achou dentro, olha para TRÁS no texto geral
         if (!detectedBimester) {
             const textBefore = cleanText.slice(0, match.startIndex);
             const lastB1 = textBefore.lastIndexOf('1º bimestre');
@@ -284,20 +261,16 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
                 { id: 'b2', idx: lastB2 }, 
                 { id: 'b3', idx: lastB3 }, 
                 { id: 'b4', idx: lastB4 }
-            ].sort((a, b) => b.idx - a.idx); // O maior índice é o mais próximo (header imediatamente acima)
+            ].sort((a, b) => b.idx - a.idx);
 
             if (headers[0].idx !== -1) {
-                // VERIFICAÇÃO DE MENU:
-                // Se detectar que existe um menu "1º...4º" compactado logo acima, e o usuário NÃO forçou um bimestre,
-                // assumimos B1 (aba ativa padrão) para evitar detectar B4 erroneamente do menu.
                 const validHeaders = headers.filter(h => h.idx !== -1);
                 if (validHeaders.length > 1) {
                     const minIdx = Math.min(...validHeaders.map(h => h.idx));
                     const maxIdx = Math.max(...validHeaders.map(h => h.idx));
                     
-                    // Se todos os headers estão num bloco pequeno (< 200 chars), é um menu
                     if (maxIdx - minIdx < 200) {
-                         detectedBimester = 'b1'; // Fallback seguro
+                         detectedBimester = 'b1'; 
                     } else {
                         detectedBimester = headers[0].id as BimesterKey;
                     }
@@ -305,32 +278,24 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
                     detectedBimester = headers[0].id as BimesterKey;
                 }
             } else {
-                // Sem cabeçalhos? Padrão B1.
                 detectedBimester = 'b1';
             }
         }
       }
     }
 
-    if (!detectedBimester) return;
-
-    // 5. Extrair Valores da Seção
-    const hasDetailedKeywords = /teste\s*mensal|teste\s*bimestral|teste\s*dirigido|avaliação|pontuação/i.test(match.sectionText);
-
+    // 5. Extrair Valores
+    
+    // Função local para buscar valor
     const findValue = (labelRegex: RegExp): string | null => {
       const matchLabel = labelRegex.exec(match.sectionText);
       if (!matchLabel) return null; 
       
       const textAfterLabel = match.sectionText.slice(matchLabel.index + matchLabel[0].length);
-
-      // Regex para lidar com "- / 10.00" ou apenas "-"
-      // Verifica explicitamente se começa com traço seguido de barra ou quebra de linha
       const emptyMatch = textAfterLabel.match(/^\s*-\s*\//) || textAfterLabel.match(/^\s*-\s*(\n|$)/);
       if (emptyMatch) {
           return ''; 
       }
-
-      // Busca número (ex: 9.00)
       const matchNumber = textAfterLabel.match(/(\d+([.,]\d+)?)/);
       if (matchNumber) {
         return parseFloat(matchNumber[0].replace(',', '.')).toFixed(2);
@@ -338,26 +303,30 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
       return ''; 
     };
 
+    // --- Lógica Principal de Extração ---
+    
+    const hasDetailedKeywords = /teste\s*mensal|teste\s*bimestral|teste\s*dirigido|avaliação|pontuação/i.test(match.sectionText);
+
     // MODO DETALHADO (TM/TB/TD)
-    // Se forçado, ou se for sequência, ou se tiver keywords detalhadas
-    if (hasDetailedKeywords || forceBimester || matches.length > 1) {
+    if (detectedBimester && (hasDetailedKeywords || forceBimester || matches.length > 1)) {
         const tmVal = findValue(/teste\s*mensal/);
         const tbVal = findValue(/teste\s*bimestral/);
         const tdVal = findValue(/teste\s*dirigido|trabalhos/);
         
-        // Se achou qualquer valor OU se identificou campo vazio (''), salvamos.
-        // Se já existe valor (de uma Matéria anterior unificada ex: Mat I), só sobrescreve se o novo for válido (não nulo)
         if (tmVal !== null || tbVal !== null || tdVal !== null) {
+            const currentObj = result[detectedBimester];
             result[detectedBimester] = {
-                tm: tmVal !== null ? tmVal : result[detectedBimester].tm,
-                tb: tbVal !== null ? tbVal : result[detectedBimester].tb,
-                td: tdVal !== null ? tdVal : result[detectedBimester].td
+                ...currentObj,
+                tm: tmVal !== null ? tmVal : currentObj.tm,
+                tb: tbVal !== null ? tbVal : currentObj.tb,
+                td: tdVal !== null ? tdVal : currentObj.td
             };
             hasAnyData = true;
         }
     } 
-    // MODO GERAL (Médias Finais apenas) - fallback
+    // MODO GERAL (Médias Finais apenas)
     else {
+        // Tenta pegar médias explicitamente listadas no texto
         const b1Avg = findValue(/1[ºo°]?\s*bimestre/);
         const b2Avg = findValue(/2[ºo°]?\s*bimestre/);
         const b3Avg = findValue(/3[ºo°]?\s*bimestre/);
@@ -368,6 +337,60 @@ const localFastParse = (fullText: string, subject: string, forceBimester?: Bimes
         if (b3Avg !== null) { result.b3.tb = b3Avg; hasAnyData = true; }
         if (b4Avg !== null) { result.b4.tb = b4Avg; hasAnyData = true; }
     }
+
+    // --- LÓGICA DE RECUPERAÇÃO SEMESTRAL (CROSS-BIMESTRE) ---
+    // Apenas extrai os valores, não aplica soma no TB aqui. A soma ocorre no App.tsx.
+    
+    const rec1ValStr = findValue(/rec(?:upera[cç][aã]o)?.*?1[ºo°]?\s*sem(?:estre)?/i);
+    if (rec1ValStr && rec1ValStr !== '') {
+        result.b2.recuperacao = rec1ValStr;
+        hasAnyData = true;
+    }
+
+    const rec2ValStr = findValue(/rec(?:upera[cç][aã]o)?.*?2[ºo°]?\s*sem(?:estre)?/i);
+    if (rec2ValStr && rec2ValStr !== '') {
+        result.b4.recuperacao = rec2ValStr;
+        hasAnyData = true;
+    }
+
+    // --- LÓGICA DE RESULTADO FINAL (ESCOLA) ---
+    // Estratégia: Encontrar todas as ocorrências de "Resultado/Total" e pegar a ÚLTIMA que seja um número válido isolado.
+    // Isso evita pegar "1" de "Resultado 1º Bimestre"
+    
+    // Regex global para iterar sobre todas as ocorrências
+    // Procura por: Label, seguido de caracteres não-dígitos opcionais, seguido de número
+    const finalResRegex = /(?:Resultado|Total|Média Final)[\s\S]*?(\d+(?:[.,]\d+)?)/gi;
+    let matchFinal;
+    let lastValidFinalResult = null;
+    
+    // Reinicia o índice da regex se necessário (embora seja nova instância)
+    finalResRegex.lastIndex = 0;
+
+    while ((matchFinal = finalResRegex.exec(match.sectionText)) !== null) {
+        // matchFinal[0] contém o texto desde o label até o número
+        // matchFinal[1] é o número capturado
+        
+        // Verifica o caractere IMEDIATAMENTE após o número
+        // O índice do número dentro de match.sectionText
+        const endOfNumberIndex = finalResRegex.lastIndex;
+        const charAfter = match.sectionText[endOfNumberIndex];
+        
+        // Se for seguido de indicador ordinal (º, °), PROVAVELMENTE é um cabeçalho (ex: Resultado 1º Bimestre)
+        // Então ignoramos.
+        if (charAfter === 'º' || charAfter === '°' || charAfter === 'ª') {
+            continue;
+        }
+
+        const val = parseFloat(matchFinal[1].replace(',', '.'));
+        if (!isNaN(val) && val >= 0 && val <= 10) {
+            lastValidFinalResult = matchFinal[1].replace(',', '.');
+        }
+    }
+
+    if (lastValidFinalResult) {
+        result.finalResult = parseFloat(lastValidFinalResult).toFixed(2);
+    }
+
   });
 
   return hasAnyData ? result : null;
