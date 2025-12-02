@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Download, Trash2, MoonStar, SunMedium, ExternalLink, Sparkles, GraduationCap, HelpCircle } from 'lucide-react';
+import { X, Download, Trash2, MoonStar, SunMedium, ExternalLink, Sparkles, GraduationCap, HelpCircle, Lightbulb, List, Eye } from 'lucide-react';
 
 interface MenuProps {
   isOpen: boolean;
@@ -8,8 +8,11 @@ interface MenuProps {
   onClear: () => void;
   onAiAnalysis: () => void;
   onOpenTutorial: () => void;
+  onOpenSuggestion: () => void;
   toggleTheme: () => void;
   isDarkMode: boolean;
+  toggleViewMode: () => void;
+  viewMode: 'simple' | 'detailed';
 }
 
 const Menu: React.FC<MenuProps> = ({ 
@@ -19,8 +22,11 @@ const Menu: React.FC<MenuProps> = ({
   onClear, 
   onAiAnalysis,
   onOpenTutorial,
+  onOpenSuggestion,
   toggleTheme, 
-  isDarkMode 
+  isDarkMode,
+  toggleViewMode,
+  viewMode
 }) => {
   return (
     <>
@@ -81,6 +87,14 @@ const Menu: React.FC<MenuProps> = ({
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Configurações
             </p>
+            
+            <button 
+              onClick={() => { toggleViewMode(); onClose(); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              {viewMode === 'simple' ? <List size={20} className="text-indigo-500" /> : <Eye size={20} className="text-indigo-500" />}
+              {viewMode === 'simple' ? 'Mudar para Detalhado' : 'Mudar para Resumo'}
+            </button>
 
             <button 
               onClick={toggleTheme}
@@ -105,8 +119,16 @@ const Menu: React.FC<MenuProps> = ({
             <div className="my-4 border-t border-slate-100 dark:border-slate-800"></div>
             
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Ajuda
+              Ajuda & Feedback
             </p>
+
+            <button 
+              onClick={() => { onOpenSuggestion(); onClose(); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Lightbulb size={20} className="text-amber-500" />
+              Ideias & Sugestões
+            </button>
 
             <button 
               onClick={() => { onOpenTutorial(); onClose(); }}

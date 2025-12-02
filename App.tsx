@@ -10,12 +10,13 @@ import {
   ReferenceLine,
   Cell
 } from 'recharts';
-import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft, Eye, List, HelpCircle, School } from 'lucide-react';
+import { Sparkles, TrendingUp, Save, Download, MoonStar, SunMedium, BookOpen, ChevronDown, Menu as MenuIcon, ArrowLeft, Eye, List, HelpCircle, School, Lightbulb } from 'lucide-react';
 import InputCard from './components/InputCard';
 import ImportModal from './components/ImportModal';
 import Menu from './components/Menu';
 import LandingPage from './components/LandingPage';
 import TutorialModal from './components/TutorialModal';
+import SuggestionModal from './components/SuggestionModal';
 import { YearScores, BimesterAverages, SemesterAverages, BimesterKey, ScoreKey, AIAnalysisResult, BimesterScores, SubjectMap } from './types';
 import { analyzeGrades } from './services/geminiService';
 
@@ -78,6 +79,7 @@ export default function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
 
   // Computed Current Scores based on selected Subject
   const currentScores = useMemo(() => {
@@ -338,6 +340,11 @@ export default function App() {
           onClose={() => setIsTutorialOpen(false)}
         />
 
+        <SuggestionModal
+          isOpen={isSuggestionOpen}
+          onClose={() => setIsSuggestionOpen(false)}
+        />
+
         <Menu 
           isOpen={isMenuOpen}
           onClose={() => setIsMenuOpen(false)}
@@ -345,8 +352,11 @@ export default function App() {
           onClear={clearData}
           onAiAnalysis={handleAiAnalysis}
           onOpenTutorial={() => setIsTutorialOpen(true)}
+          onOpenSuggestion={() => setIsSuggestionOpen(true)}
           toggleTheme={toggleTheme}
           isDarkMode={isDarkMode}
+          toggleViewMode={toggleViewMode}
+          viewMode={viewMode}
         />
 
         {/* Header */}
@@ -372,86 +382,15 @@ export default function App() {
 
           <div className="flex items-center gap-2">
             
-            <div className="hidden md:flex items-center gap-2">
-               
-               <button 
-                onClick={() => setIsTutorialOpen(true)}
-                className={`p-2 rounded-lg border transition-colors ${
-                  isDarkMode 
-                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
-                    : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
-                }`}
-                title="Ajuda / Tutorial"
-               >
-                 <HelpCircle size={20} />
-               </button>
-
-               {/* View Toggle */}
-               <button 
-                onClick={toggleViewMode}
-                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
-                  isDarkMode 
-                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
-                    : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
-                }`}
-                title={viewMode === 'simple' ? "Mudar para Detalhado (Notas Parciais)" : "Mudar para Resultados Gerais"}
-               >
-                 {viewMode === 'simple' ? <List size={18} /> : <Eye size={18} />}
-                 <span className="hidden lg:inline">{viewMode === 'simple' ? 'Detalhes' : 'Resumo'}</span>
-               </button>
-
-               <button 
-                onClick={toggleTheme}
-                className={`p-2 rounded-lg border transition-colors ${
-                  isDarkMode 
-                    ? 'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700' 
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-               >
-                 {isDarkMode ? <MoonStar size={20} /> : <SunMedium size={20} />}
-               </button>
-
-               <button 
-                onClick={clearData}
-                className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
-                  isDarkMode 
-                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
-                    : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
-                }`}
-               >
-                 Limpar
-               </button>
-               
-               <button 
-                onClick={() => setIsImportModalOpen(true)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
-                  isDarkMode
-                    ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-blue-400'
-                    : 'text-slate-700 bg-white border-slate-200 hover:bg-slate-50 hover:text-blue-600'
-                }`}
-               >
-                 <Download size={16} />
-                 Importar
-               </button>
-
-               <button 
-                onClick={handleAiAnalysis}
-                disabled={isAiLoading}
-                className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-70 disabled:hover:scale-100"
-               >
-                 {isAiLoading ? (
-                   <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-                 ) : (
-                   <Sparkles size={16} />
-                 )}
-                 Dicas IA
-               </button>
-            </div>
-
-            {/* Mobile Menu Button */}
+            {/* Unified Desktop & Mobile Menu Button */}
             <button
               onClick={() => setIsMenuOpen(true)}
-              className="md:hidden p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+              className={`p-2 rounded-lg border transition-colors ${
+                 isDarkMode 
+                 ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' 
+                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+              title="Menu Principal"
             >
               <MenuIcon size={24} />
             </button>

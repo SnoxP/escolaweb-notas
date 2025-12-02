@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calculator, ExternalLink, ChevronRight, FileText, History, Sparkles } from 'lucide-react';
+import React from 'react';
+import { Calculator, ExternalLink, ChevronRight, FileText, History } from 'lucide-react';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -8,42 +8,15 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportClick }) => {
   
-  // Função para calcular tempo relativo
-  const getRelativeTime = (dateInput: string | Date) => {
-    const date = new Date(dateInput);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return 'Agora mesmo';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m atrás`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h atrás`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d atrás`; // até 7 dias
-    
-    // Se for mais antigo, retorna a data formatada
-    return date.toLocaleDateString('pt-BR');
-  };
-
-  // State para forçar atualização do tempo relativo a cada minuto (opcional, para manter o "Agora" vivo)
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Constante para um dia em milissegundos
-  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
   const changelog = [
     {
       version: '2.08',
-      date: new Date(), // Agora
       changes: [
         'Correção crítica na detecção de bimestres: agora prioriza nomes explícitos (ex: "4º Bimestre") em vez da ordem de aparição, corrigindo notas trocadas.'
       ]
     },
     {
       version: '2.07',
-      date: new Date(Date.now() - ONE_DAY_MS * 0.1), // Hoje cedo
       changes: [
         'Destaque visual (selo) para a "Nota Oficial da Escola" no resumo anual.',
         'Nota de Recuperação agora aparece em destaque ao lado da média do bimestre.'
@@ -51,7 +24,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.06',
-      date: new Date(Date.now() - ONE_DAY_MS * 1), // Ontem
       changes: [
         'Refinamento completo da lógica de cálculo (Médias Semestrais e Final).',
         'Visualização da "Nota Oficial da Escola" e Total de Pontos importados.',
@@ -60,7 +32,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.05',
-      date: new Date(Date.now() - ONE_DAY_MS * 1.2), 
       changes: [
         'Ajuste no Déficit Anual: Notas acima da média agora abatem a dívida de pontos.',
         'Refinamentos na interface de cálculo final.'
@@ -68,7 +39,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.04',
-      date: new Date(Date.now() - ONE_DAY_MS * 2), 
       changes: [
         'Cálculo de Prova Final: Exibe nota necessária + pontos faltantes.',
         'Ajuste na interface de Resultados Finais.'
@@ -76,7 +46,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.03',
-      date: new Date(Date.now() - ONE_DAY_MS * 2.2), 
       changes: [
         'Correção no cálculo da Prova Final (Pontos Faltantes).',
         'Melhoria na detecção de Recuperação Semestral.',
@@ -84,7 +53,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.02',
-      date: new Date(Date.now() - ONE_DAY_MS * 3), 
       changes: [
         'Cálculo de Recuperação Semestral (Nota/4) integrado.',
         'Visualização da nota de recuperação no rodapé do card.',
@@ -93,7 +61,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.01',
-      date: new Date(Date.now() - ONE_DAY_MS * 3.2), 
       changes: [
         'Unificação de matérias (Matemática I/II → Matemática).',
         'Novo Tutorial interativo de uso.',
@@ -102,7 +69,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
     },
     {
       version: '2.00',
-      date: new Date(Date.now() - ONE_DAY_MS * 4), 
       changes: [
         'Novo Design System (Dark/Light Mode).',
         'Integração com IA Gemini para dicas de estudo.',
@@ -208,9 +174,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                        {getRelativeTime(log.date)}
-                      </span>
                    </div>
                    <ul className="pl-4 mt-2 space-y-1">
                       {log.changes.map((change, cIdx) => (
