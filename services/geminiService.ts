@@ -8,15 +8,24 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // List of subjects to scan for during bulk import
 // ATENÇÃO: Esta lista deve estar sincronizada com a do App.tsx
-// Nomes Unificados
+// Nomes Unificados (Ordem Alfabética)
 const KNOWN_SUBJECTS = [
-  "Filosofia", "Geografia", "Artes", "Química", "Inglês", "Física",
-  "Matemática", // Unificado
+  "Artes",
   "Biologia",   // Unificado
-  "História", "Literatura", 
+  "Educação Física", 
+  "Espanhol", 
+  "Filosofia", 
+  "Física", 
+  "Geografia", 
+  "História", 
+  "Inglês", 
+  "Literatura", 
   "Língua Portuguesa", // Unificado
-  "Educação Física", "Redação", "Sociologia",
-  "Espanhol", "Projeto de Vida"
+  "Matemática", // Unificado
+  "Projeto de Vida",
+  "Química", 
+  "Redação", 
+  "Sociologia"
 ];
 
 export const analyzeGrades = async (

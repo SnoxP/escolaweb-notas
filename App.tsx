@@ -28,24 +28,24 @@ const INITIAL_SCORES: YearScores = {
   finalResult: ''
 };
 
-// Lista unificada de matérias
+// Lista unificada de matérias em ordem alfabética
 const SUBJECTS = [
-  "Filosofia", 
-  "Geografia", 
-  "Artes", 
-  "Química", 
-  "Inglês", 
-  "Física", 
-  "Matemática", // Unificado (I, II, Fundamental)
+  "Artes",
   "Biologia",   // Unificado (I, II)
+  "Educação Física",
+  "Espanhol",
+  "Filosofia", 
+  "Física", 
+  "Geografia", 
   "História", 
+  "Inglês", 
   "Literatura", 
   "Língua Portuguesa", // Unificado (Gramática, Interpretação)
-  "Educação Física",
+  "Matemática", // Unificado (I, II, Fundamental)
+  "Projeto de Vida",
+  "Química", 
   "Redação",
-  "Sociologia",
-  "Espanhol",
-  "Projeto de Vida"
+  "Sociologia"
 ];
 
 export default function App() {
