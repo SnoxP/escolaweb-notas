@@ -157,7 +157,7 @@ const Menu: React.FC<MenuProps> = ({
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Notas da Escolaweb</p>
-                  <p className="text-[10px]">Versão 2.08</p>
+                  <p className="text-[10px]">Versão 2.09</p>
                 </div>
              </div>
           </div>

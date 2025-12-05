@@ -325,6 +325,19 @@ export default function App() {
     );
   }
 
+  // --- DERIVED STATE FOR FINAL STATUS ---
+  // Calcula a "Nota Efetiva" para determinar Aprovado/Reprovado
+  // Se existir Nota Oficial da Escola, usa ela. Senão, usa a Média Calculada.
+  const officialFinal = currentScores.finalResult 
+    ? parseFloat(currentScores.finalResult.replace(',', '.')) 
+    : null;
+    
+  const effectiveFinalGrade = (officialFinal !== null && !isNaN(officialFinal)) 
+    ? officialFinal 
+    : finalAverage;
+
+  const isApproved = effectiveFinalGrade !== null && effectiveFinalGrade >= PASSING_GRADE;
+
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       <div className="flex flex-col items-center py-8 px-4 sm:px-6">
@@ -549,13 +562,13 @@ export default function App() {
                   <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                     <div className="flex justify-between items-center mb-1">
                       <p className={`text-sm font-bold uppercase tracking-wide ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Média Final</p>
-                      {finalAverage !== null && (
+                      {effectiveFinalGrade !== null && (
                         <span className={`text-xs px-2 py-1 rounded-md font-bold ${
-                          finalAverage >= PASSING_GRADE 
+                          isApproved
                             ? (isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700')
                             : (isDarkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700')
                         }`}>
-                          {finalAverage >= PASSING_GRADE ? 'Aprovado' : 'Reprovado'}
+                          {isApproved ? 'Aprovado' : 'Reprovado'}
                         </span>
                       )}
                     </div>
@@ -563,7 +576,7 @@ export default function App() {
                     <div className="flex flex-col items-center">
                        <span className={`text-4xl font-extrabold ${
                           finalAverage === null ? 'text-slate-300 dark:text-slate-700' :
-                          finalAverage >= PASSING_GRADE ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          isApproved ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                        }`}>
                           {finalAverage !== null ? finalAverage.toFixed(1) : '-'}
                        </span>
@@ -589,23 +602,23 @@ export default function App() {
                           Mínimo para passar: {PASSING_GRADE.toFixed(1)}
                        </p>
 
-                       {/* Pontos Faltantes (Final) */}
-                       {finalAverage !== null && finalAverage < PASSING_GRADE && (
-                         <div className="mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/30 flex flex-col gap-1 w-full">
-                           <p className="text-sm font-bold text-red-600 dark:text-red-400 text-center">
-                             Precisa tirar {(10 - finalAverage).toFixed(1)} na Prova Final
-                           </p>
-                           <p className="text-[10px] text-red-500 dark:text-red-400/80 text-center uppercase tracking-wide font-semibold">
-                             Déficit Anual: {totalBimesterDeficit.toFixed(1)} pts
-                           </p>
-                         </div>
+                       {/* Pontos Faltantes (Final) - Só aparece se NÃO ESTIVER APROVADO */}
+                       {effectiveFinalGrade !== null && !isApproved && (
+                           <div className="mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/30 flex flex-col gap-1 w-full">
+                             <p className="text-sm font-bold text-red-600 dark:text-red-400 text-center">
+                               Precisa tirar {((7 - effectiveFinalGrade) * 4).toFixed(1)} na Prova Final
+                             </p>
+                             <p className="text-[10px] text-red-500 dark:text-red-400/80 text-center uppercase tracking-wide font-semibold">
+                               Déficit Anual: {totalBimesterDeficit.toFixed(1)} pts
+                             </p>
+                           </div>
                        )}
 
-                       {/* Pontos Sobrando (Final) */}
-                       {finalAverage !== null && finalAverage >= PASSING_GRADE && (
+                       {/* Pontos Sobrando (Final) - Aparece se ESTIVER APROVADO */}
+                       {effectiveFinalGrade !== null && isApproved && (
                          <div className="mt-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
                            <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 text-center">
-                             Sobram {((finalAverage - PASSING_GRADE) * 4).toFixed(1)} pontos escolares
+                             Sobram {((effectiveFinalGrade - PASSING_GRADE) * 4).toFixed(1)} pontos escolares
                            </p>
                          </div>
                        )}

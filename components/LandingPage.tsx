@@ -10,6 +10,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onPartialImportCl
   
   const changelog = [
     {
+      version: '2.09',
+      changes: [
+        'Novo cálculo de Recuperação Final: Fórmula ajustada para (7 - Média) * 4.',
+        'Aprovação Inteligente: Se a Nota Oficial da Escola for ≥ 7.0, o status será "Aprovado" automaticamente.',
+        'Organização alfabética das matérias e melhorias no menu para Desktop.'
+      ]
+    },
+    {
       version: '2.08',
       changes: [
         'Correção crítica na detecção de bimestres: agora prioriza nomes explícitos (ex: "4º Bimestre") em vez da ordem de aparição, corrigindo notas trocadas.'
